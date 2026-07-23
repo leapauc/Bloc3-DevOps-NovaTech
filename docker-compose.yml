@@ -1,0 +1,141 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hrflow_dev
+      POSTGRES_USER: hrflow
+      POSTGRES_PASSWORD: hrflow_dev_pass
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hrflow -d hrflow_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+
+  auth:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./.env.local
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hrflow_dev
+      DB_USER: hrflow
+      DB_PASSWORD: hrflow_dev_pass
+      DATABASE_URL: postgresql://hrflow:hrflow_dev_pass@postgres:5432/hrflow_dev
+      JWT_SECRET: dev_secret_local_only
+      JWT_REFRESH_SECRET: dev_refresh_secret_local_only
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  paie:
+    build:
+      context: ./services/paie
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./.env.local
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hrflow_dev
+      DB_USER: hrflow
+      DB_PASSWORD: hrflow_dev_pass
+      DATABASE_URL: postgresql://hrflow:hrflow_dev_pass@postgres:5432/hrflow_dev
+      STRIPE_SECRET_KEY: sk_test_placeholder
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  conges:
+    build:
+      context: ./services/conges
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./.env.local
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hrflow_dev
+      DB_USER: hrflow
+      DB_PASSWORD: hrflow_dev_pass
+      DATABASE_URL: postgresql://hrflow:hrflow_dev_pass@postgres:5432/hrflow_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  recrutement:
+    build:
+      context: ./services/recrutement
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./.env.local
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hrflow_dev
+      DB_USER: hrflow
+      DB_PASSWORD: hrflow_dev_pass
+      DATABASE_URL: postgresql://hrflow:hrflow_dev_pass@postgres:5432/hrflow_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./.env.local
+    environment:
+      NODE_ENV: development
+      AUTH_SERVICE_URL: http://auth:3001
+      PAIE_SERVICE_URL: http://paie:3002
+      CONGES_SERVICE_URL: http://conges:3003
+      RECRUTEMENT_SERVICE_URL: http://recrutement:3004
+    depends_on:
+      - auth
+      - paie
+      - conges
+      - recrutement
+    ports:
+      - "3006:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3005
+      HOST: 0.0.0.0
+      REACT_APP_API_URL: http://localhost:3006/api
+    depends_on:
+      - gateway
+    ports:
+      - "3007:3005"
+
+volumes:
+  postgres_data:

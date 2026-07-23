@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api' 
 
 // Dashboard principal — Camille jan 2022
 // TODO: découper en composants (trop long pour l'instant)
@@ -11,9 +12,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (!token) { window.location.href = '/'; return }
     // Pas de gestion d'erreur si token expiré
-    axios.get(`/api/conges/solde/${user.id}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(r => setConges(r.data)).catch(console.error)
+    axios.get(`${API_URL}/conges/solde/${user.id}`, { 
+      headers: { Authorization: `Bearer ${token}` } 
+    }).then(r => setConges(r.data)).catch(console.error) 
   }, [])
 
   return (

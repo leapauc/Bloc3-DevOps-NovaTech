@@ -10,10 +10,10 @@ app.use((req, res, next) => {
   next()
 })
 
-app.use('/api/auth', createProxyMiddleware({ target: 'http://localhost:3001', changeOrigin: true }))
-app.use('/api/paie', createProxyMiddleware({ target: 'http://localhost:3002', changeOrigin: true }))
-app.use('/api/conges', createProxyMiddleware({ target: 'http://localhost:3003', changeOrigin: true }))
-app.use('/api/recrutement', createProxyMiddleware({ target: 'http://localhost:3004', changeOrigin: true }))
+app.use('/api/auth', createProxyMiddleware({ target: 'http://localhost:3001', changeOrigin: true, pathRewrite: { '^/api/auth': '/auth' } })) 
+app.use('/api/paie', createProxyMiddleware({ target: 'http://localhost:3002', changeOrigin: true, pathRewrite: { '^/api/paie': '/paie' } })) 
+app.use('/api/conges', createProxyMiddleware({ target: 'http://localhost:3003', changeOrigin: true, pathRewrite: { '^/api/conges': '/conges' } })) 
+app.use('/api/recrutement', createProxyMiddleware({ target: 'http://localhost:3004', changeOrigin: true, pathRewrite: { '^/api/recrutement': '/recrutement' } })) 
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }))
 

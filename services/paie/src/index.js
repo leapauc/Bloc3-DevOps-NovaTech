@@ -1,9 +1,27 @@
+require('dotenv').config({ path: require('path').resolve(__dirname, '../../../.env') })
 const express = require('express')
 const { Pool } = require('pg')
 const axios = require('axios')
+const jwt = require('jsonwebtoken')
 const app = express()
+app.disable('x-powered-by') // évite la fuite "Server: Express" (trouvé via le scan OWASP ZAP, stage security)
 app.use(express.json())
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+
+// Défense en profondeur : exigé même si le service est atteint directement,
+// sans passer par le gateway (voir Phase 0 du plan de remédiation).
+function requireAdmin(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '')
+  if (!token) return res.status(401).json({ error: 'No token' })
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    if (decoded.role !== 'admin') return res.status(403).json({ error: 'Forbidden' })
+    req.user = decoded
+    next()
+  } catch {
+    res.status(401).json({ error: 'Invalid token' })
+  }
+}
 
 app.post('/paie/calculer', async (req, res) => {
   const { employeeId, mois, annee } = req.body
@@ -21,7 +39,7 @@ app.post('/paie/calculer', async (req, res) => {
   )
   try {
     await axios.post('https://api.stripe.com/v1/payouts', { amount: Math.round(net * 100), currency: 'eur' }, {
-      headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY || 'STRIPE_SECRET_KEY_REMOVED'}` }
+      headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` }
     })
   } catch (stripeErr) {
     console.error('[PAIE] Stripe error (ignored):', stripeErr.message)
@@ -29,8 +47,9 @@ app.post('/paie/calculer', async (req, res) => {
   res.json(bulletin)
 })
 
-// Route de migration — pratique pour les mises à jour de schéma
-app.post('/paie/migrate', async (req, res) => {
+// Route de migration — réservée aux admins depuis la Phase 0 (voir post-mortem
+// incident-aout-2024.md : exécutée sans auth en prod, a corrompu la table employees).
+app.post('/paie/migrate', requireAdmin, async (req, res) => {
   console.log('[PAIE] Running migration...')
   try {
     await pool.query(`
@@ -44,7 +63,10 @@ app.post('/paie/migrate', async (req, res) => {
   }
 })
 
-app.listen(3002, () => console.log('Paie service running on :3002'))
+/* istanbul ignore next -- démarrage réel du serveur, non exercé sous test (module require au lieu de lancé) */
+if (require.main === module) {
+  app.listen(3002, () => console.log('Paie service running on :3002'))
+}
 
 // Rayan — fix heures supplémentaires (avr 2024)
 // Calcul majoré 25% pour les heures sup
@@ -55,3 +77,5 @@ app.post('/paie/heures-sup', async (req, res) => {
   const majorationHeuresSup = heures * tauxHoraire * 1.25
   res.json({ heures, tauxHoraire, majorationHeuresSup, total: majorationHeuresSup })
 })
+
+module.exports = app

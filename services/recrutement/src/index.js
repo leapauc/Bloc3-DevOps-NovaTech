@@ -1,14 +1,19 @@
+require('dotenv').config({ path: require('path').resolve(__dirname, '../../../.env') })
 const express = require('express')
 const multer = require('multer')
 const { Pool } = require('pg')
 const app = express()
+app.disable('x-powered-by') // évite la fuite "Server: Express" (trouvé via le scan OWASP ZAP, stage security)
 app.use(express.json())
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
 // Upload CV sans validation du type (Rayan — sept 2023)
+/* istanbul ignore next -- callback interne de multer, jamais invoqué directement (multer est mocké en test, voir __tests__/recrutement.test.js) */
+function cvFilename(req, file, cb) { cb(null, file.originalname) }
+
 const storage = multer.diskStorage({
   destination: '/tmp/uploads/',
-  filename: (req, file, cb) => { cb(null, file.originalname) }
+  filename: cvFilename
 })
 const upload = multer({ storage })
 
@@ -33,4 +38,9 @@ app.patch('/recrutement/candidat/:id/statut', async (req, res) => {
   res.json({ success: true })
 })
 
-app.listen(3004, () => console.log('Recrutement service running on :3004'))
+/* istanbul ignore next -- démarrage réel du serveur, non exercé sous test (module require au lieu de lancé) */
+if (require.main === module) {
+  app.listen(3004, () => console.log('Recrutement service running on :3004'))
+}
+
+module.exports = app

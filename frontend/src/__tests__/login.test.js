@@ -1,18 +1,40 @@
-// Tests écrits par Mohamed (stagiaire) — juillet 2023
-// ATTENTION : ces tests ne passent plus depuis la refacto de novembre 2023
-// TODO: mettre à jour ou supprimer (Camille, déc 2023) — jamais fait
+import React from 'react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import '@testing-library/jest-dom'
+import axios from 'axios'
+import Login from '../components/Login'
 
-const { render, screen } = require('@testing-library/react')
+jest.mock('axios')
 
-describe('LoginForm', () => {
-  test('should render login form', () => {
-    // Import cassé — le composant a été renommé
-    // render(<LoginForm />)
-    expect(true).toBe(true) // test vide pour ne pas casser la CI
+beforeEach(() => {
+  localStorage.clear()
+  jest.clearAllMocks()
+})
+
+describe('Login', () => {
+  test('affiche le formulaire de connexion', () => {
+    render(<Login />)
+    expect(screen.getByPlaceholderText('Email')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Mot de passe')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Connexion' })).toBeInTheDocument()
   })
 
-  test('should show error on invalid credentials', () => {
-    // TODO: implémenter
-    expect(true).toBe(true)
+  test('affiche une erreur sur identifiants invalides', async () => {
+    axios.post.mockRejectedValueOnce({ response: { data: { error: 'Invalid credentials' } } })
+    render(<Login />)
+    fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'a@b.com' } })
+    fireEvent.change(screen.getByPlaceholderText('Mot de passe'), { target: { value: 'wrong' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Connexion' }))
+    expect(await screen.findByText('Identifiants invalides')).toBeInTheDocument()
+  })
+
+  test('stocke le token et l\'utilisateur en cas de succès', async () => {
+    axios.post.mockResolvedValueOnce({ data: { token: 'abc', user: { id: 1, email: 'a@b.com', role: 'user' } } })
+    render(<Login />)
+    fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'a@b.com' } })
+    fireEvent.change(screen.getByPlaceholderText('Mot de passe'), { target: { value: 'good' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Connexion' }))
+    await waitFor(() => expect(localStorage.getItem('hrflow_token')).toBe('abc'))
+    expect(JSON.parse(localStorage.getItem('hrflow_user'))).toEqual({ id: 1, email: 'a@b.com', role: 'user' })
   })
 })

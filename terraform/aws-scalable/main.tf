@@ -2,7 +2,7 @@ locals {
   name_prefix = "${var.project_name}-${var.environment}"
   service_names = ["frontend", "gateway", "auth", "paie", "conges", "recrutement"]
 }
-
+# VPC: réseau privé AWS de l'application
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
@@ -12,7 +12,7 @@ resource "aws_vpc" "main" {
     Name = "${local.name_prefix}-vpc"
   }
 }
-
+# Accés à internet du VPC
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
@@ -20,7 +20,7 @@ resource "aws_internet_gateway" "main" {
     Name = "${local.name_prefix}-igw"
   }
 }
-
+# Hébergement des services accessibles depuis Internet
 resource "aws_subnet" "public" {
   count = length(var.public_subnets)
 
@@ -33,7 +33,7 @@ resource "aws_subnet" "public" {
     Name = "${local.name_prefix}-public-${count.index + 1}"
   }
 }
-
+# Hébergement des services inaccessibles depuis Internet
 resource "aws_subnet" "private" {
   count = length(var.private_subnets)
 

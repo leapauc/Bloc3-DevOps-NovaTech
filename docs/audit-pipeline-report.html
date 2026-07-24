@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Audit HRFlow & Architecture Pipeline</title>
+  <style>
+    :root {
+      --bg: #081c2e;
+      --card: #112b4f;
+      --text: #e8f7ff;
+      --muted: #8fbfdd;
+      --accent: #4fd1c5;
+      --accent-dark: #239a96;
+      --accent-alt: #ff8a65;
+      --accent-purple: #8b7dff;
+      --border: rgba(255,255,255,0.12);
+      --shadow: 0 30px 90px rgba(0,0,0,0.30);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, rgba(79,209,197,0.15), transparent 35%),
+                  linear-gradient(180deg, #081c2e 0%, #04111f 100%);
+      color: var(--text);
+      line-height: 1.65;
+    }
+    header {
+      padding: 3rem 2rem 1rem;
+      text-align: center;
+    }
+    h1 { margin: 0; font-size: clamp(2rem, 3vw, 3rem); }
+    p.intro { margin: 1rem auto 0; max-width: 720px; color: var(--muted); }
+    main { padding: 0 2rem 3rem; max-width: 1200px; margin: 0 auto; }
+    .grid {
+      display: grid;
+      gap: 1.5rem;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(12, 35, 60, 0.96), rgba(8, 20, 38, 0.95));
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      padding: 1.75rem;
+      backdrop-filter: blur(8px);
+    }
+    .card h2 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: #fff;
+      font-size: 1.55rem;
+    }
+    .summary-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 0.9rem;
+      border-radius: 999px;
+      background: rgba(79, 209, 197, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(79, 209, 197, 0.18);
+      font-size: 0.95rem;
+      margin-right: 0.5rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      padding: 0.9rem 0.8rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-feature-settings: "tnum";
+    }
+    th { color: var(--muted); font-weight: 600; }
+    .code {
+      display: block;
+      width: 100%;
+      overflow-x: auto;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 1rem;
+      font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+      color: #c8eeff;
+      line-height: 1.5;
+      margin-top: 1rem;
+    }
+    .diagram {
+      display: grid;
+      gap: 1rem;
+    }
+    .pipeline-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.85rem;
+      align-items: center;
+      justify-content: center;
+      margin: 1rem 0 0.5rem;
+    }
+    .pipeline-step {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.9rem 1.2rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(79,209,197,0.18), rgba(139,125,255,0.18));
+      color: var(--text);
+      font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.08);
+      min-width: 170px;
+      justify-content: center;
+    }
+    .pipeline-step span {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+    .pipeline-line .arrow {
+      font-size: 1.2rem;
+      color: var(--accent-alt);
+      margin: 0 0.3rem;
+    }
+    .diagram svg {
+      width: 100%;
+      height: auto;
+      border-radius: 24px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.10);
+    }
+    .stage-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .stage-list li {
+      margin-bottom: 0.85rem;
+    }
+    .stage-list strong { color: #fff; }
+    footer {
+      padding-top: 2rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Audit HRFlow & Architecture Pipeline</h1>
+    <p class="intro">Rapport généré automatiquement à partir de l’analyse du dépôt existant. Le document contient l’état du code, des dépendances, de la CI/CD et une architecture pipeline en 5 étapes avec un schéma UML.</p>
+  </header>
+  <main>
+    <section class="grid">
+      <article class="card">
+        <h2>1. Synthèse du dépôt</h2>
+        <div class="summary-grid">
+          <div>
+            <p><span class="badge">Branches</span>main, dev, feature/recrutement-v2</p>
+          </div>
+          <div>
+            <p><span class="badge">Pipeline</span>GitHub Actions</p>
+          </div>
+          <div>
+            <p><span class="badge">Remote</span>https://github.com/leapauc/Bloc3-DevOps-NovaTech.git</p>
+          </div>
+          <div>
+            <p><span class="badge">Lockfile</span>package-lock.json</p>
+          </div>
+        </div>
+        <p>Le projet est un mono-repo Node/React avec un ensemble de services backend dans `services/`, un front React dans `frontend/`, et une gateway API. Le pipeline CI/CD existant est limité à la branche `main` et repose sur un déploiement SSH vers un hôte de production.</p>
+      </article>
+      <article class="card">
+        <h2>2. Historique Git récent</h2>
+        <p>Les commits les plus récents montrent une focalisation sur la centralisation des dépendances, la documentation et la stabilisation des services.</p>
+        <table>
+          <thead>
+            <tr><th>Commit</th><th>Message</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>cfc1de6</td><td>chore-refacto(deps): gather all dependencies in a main package.json at the root of the project</td></tr>
+            <tr><td>fefc6c0</td><td>test: push to test pipeline</td></tr>
+            <tr><td>93d8695</td><td>docs: guide de lecture de l'historique Git pour l'équipe entrante</td></tr>
+            <tr><td>f5ca946</td><td>docs: audit Partech + consignes pour l'équipe entrante</td></tr>
+            <tr><td>64923e0</td><td>fix(paie): calcul heures supplémentaires manquant</td></tr>
+            <tr><td>5e99ddc</td><td>ci: pipeline de déploiement GitHub Actions</td></tr>
+          </tbody>
+        </table>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>3. Dépendances principales</h2>
+      <p>Le dépôt utilise une configuration centralisée pour la plupart des packages Node/Web, avec un seul `package-lock.json` à la racine.</p>
+      <table>
+        <thead>
+          <tr><th>Dépendance</th><th>Version</th><th>Usage probable</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>axios</td><td>^1.4.0</td><td>Appels API HTTP côté client ou backend</td></tr>
+          <tr><td>bcrypt</td><td>^6.0.0</td><td>Hachage des mots de passe</td></tr>
+          <tr><td>express</td><td>^4.18.0</td><td>Serveurs backend</td></tr>
+          <tr><td>http-proxy-middleware</td><td>^2.0.6</td><td>Proxy vers APIs depuis React</td></tr>
+          <tr><td>jsonwebtoken</td><td>^9.0.3</td><td>JWT pour auth service</td></tr>
+          <tr><td>multer</td><td>^1.4.5-lts.1</td><td>Upload de fichiers multipart</td></tr>
+          <tr><td>pg</td><td>^8.11.0</td><td>Connexion PostgreSQL</td></tr>
+          <tr><td>react / react-dom</td><td>^18.2.0</td><td>Interface frontend</td></tr>
+          <tr><td>react-router-dom</td><td>^6.8.0</td><td>Routage frontend</td></tr>
+          <tr><td>react-scripts</td><td>5.0.1</td><td>Build et développement React</td></tr>
+          <tr><td>nodemon</td><td>^3.1.14</td><td>Redémarrage automatique en dev</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card diagram">
+      <h2>4. Architecture du pipeline — 5 stages</h2>
+      <p>Le pipeline actuel et proposé est résumé sur une seule ligne pour une lecture instantanée :</p>
+      <div class="pipeline-line">
+        <div class="pipeline-step"><span></span>Source</div>
+        <div class="arrow">→</div>
+        <div class="pipeline-step"><span></span>Setup</div>
+        <div class="arrow">→</div>
+        <div class="pipeline-step"><span></span>Build</div>
+        <div class="arrow">→</div>
+        <div class="pipeline-step"><span></span>Validation</div>
+        <div class="arrow">→</div>
+        <div class="pipeline-step"><span></span>Deploy</div>
+      </div>
+      <div>
+        <p><strong>UML simplifié</strong> : le flux reste linéaire, avec une étape de validation recommandée avant déploiement. La version une ligne met en évidence la progression claire de la CI vers la production.</p>
+        <pre class="code">@startuml
+Skinparam backgroundColor transparent
+skinparam rectangle {
+  BackgroundColor #102e4a
+  BorderColor #237baf
+  RoundCorner 22
+}
+source --> setup : push main
+setup --> build : node 16, npm install
+build --> validation : frontend build
+validation --> deploy : tests / checks
+deploy --> production : ssh + pm2
+@enduml</pre>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>5. Choix d'outils justifiés</h2>
+      <ul class="stage-list">
+        <li><strong>Source</strong> — GitHub : centralisation du code et déclenchement `push`. GitHub Actions est cohérent avec l'hébergement du dépôt.</li>
+        <li><strong>Setup</strong> — `actions/checkout@v2` et `actions/setup-node@v2` : standard pour récupérer le code et préparer l'environnement Node de manière reproductible.</li>
+        <li><strong>Build</strong> — `npm install` + `cd frontend && npm run build` : permet de construire le front React et de préparer le runtime backend. Le choix de `npm` est naturel puisque le projet contient un `package-lock.json` et des scripts racines partagés.</li>
+        <li><strong>Validation</strong> — tests actuellement désactivés, mais le pipeline doit évoluer vers `npm test` et l’ajout de contrôles statiques (lint / audit de sécurité) pour réduire les risques avant déploiement.</li>
+        <li><strong>Deploy</strong> — `appleboy/ssh-action@master` + `pm2 restart all` : déploiement simple via SSH vers une machine distante. Ce modèle convient pour un PoC ou un environnement d’hébergement géré, mais il faudra envisager un mécanisme plus sécurisé (`SSH key`, `deploy user`, ou `GitHub Deploy Keys`) et un déclencheur multi-environnement si le projet monte en charge.</li>
+      </ul>
+      <p>Recommandation : ajouter une étape de test fonctionnel avant `Deploy`, et transformer la commande SSH en déploiement immutable si l’infrastructure évolue vers Kubernetes ou un fournisseur cloud.</p>
+    </section>
+  </main>
+  <footer>
+    Rapport généré pour le dépôt HRFlow — architecture pipeline proposée en 5 stages.
+  </footer>
+</body>
+</html>

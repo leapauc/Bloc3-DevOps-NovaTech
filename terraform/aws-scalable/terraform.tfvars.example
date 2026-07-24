@@ -1,0 +1,55 @@
+aws_region = "eu-west-3"
+project_name = "novatech-hrflow"
+environment = "dev"
+
+vpc_cidr = "10.0.0.0/16"
+public_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnets = ["10.0.11.0/24", "10.0.12.0/24"]
+
+service_scaling = {
+  frontend = {
+    desired_count = 2
+    min_capacity  = 1
+    max_capacity  = 4
+    cpu           = 256
+    memory        = 512
+  }
+  gateway = {
+    desired_count = 2
+    min_capacity  = 1
+    max_capacity  = 6
+    cpu           = 512
+    memory        = 1024
+  }
+  auth = {
+    desired_count = 1
+    min_capacity  = 1
+    max_capacity  = 3
+    cpu           = 256
+    memory        = 512
+  }
+  paie = {
+    desired_count = 1
+    min_capacity  = 1
+    max_capacity  = 2
+    cpu           = 256
+    memory        = 512
+  }
+  conges = {
+    desired_count = 1
+    min_capacity  = 1
+    max_capacity  = 2
+    cpu           = 256
+    memory        = 512
+  }
+  recrutement = {
+    desired_count = 1
+    min_capacity  = 1
+    max_capacity  = 2
+    cpu           = 256
+    memory        = 512
+  }
+}
+
+db_username = "hrflow_admin"
+db_password = "change-me-strong-password"

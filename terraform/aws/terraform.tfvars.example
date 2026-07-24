@@ -1,0 +1,5 @@
+aws_region = "eu-west-3"
+project_name = "novatech-hrflow"
+environment = "dev"
+db_username = "hrflow_admin"
+db_password = "change-me-strong-password"

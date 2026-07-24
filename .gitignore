@@ -3,4 +3,5 @@ dist/
 build/
 .DS_Store
 .env*
+!.env.pmn
 *package-lock.json

@@ -1,8 +1,26 @@
+require('dotenv').config({ path: require('path').resolve(__dirname, '../../../.env') })
 const express = require('express')
 const { Pool } = require('pg')
+const jwt = require('jsonwebtoken')
 const app = express()
+app.disable('x-powered-by') // évite la fuite "Server: Express" (trouvé via le scan OWASP ZAP, stage security)
 app.use(express.json())
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+
+// Défense en profondeur : exigé même si le service est atteint directement,
+// sans passer par le gateway (voir Phase 0 du plan de remédiation).
+function requireAdmin(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '')
+  if (!token) return res.status(401).json({ error: 'No token' })
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    if (decoded.role !== 'admin') return res.status(403).json({ error: 'Forbidden' })
+    req.user = decoded
+    next()
+  } catch {
+    res.status(401).json({ error: 'Invalid token' })
+  }
+}
 
 app.get('/conges/solde/:employeeId', async (req, res) => {
   const { employeeId } = req.params
@@ -25,11 +43,16 @@ app.post('/conges/demande', async (req, res) => {
   res.json(result.rows[0])
 })
 
-app.listen(3003, () => console.log('Congés service running on :3003'))
+/* istanbul ignore next -- démarrage réel du serveur, non exercé sous test (module require au lieu de lancé) */
+if (require.main === module) {
+  app.listen(3003, () => console.log('Congés service running on :3003'))
+}
 
 // ENDPOINT DEBUG — ajouté par Camille pour dépanner le client Mercure (oct 2023)
-// TODO: sécuriser ou supprimer avant la prochaine mise en prod (Camille)
-app.get('/conges/debug/all', async (req, res) => {
+// Réservé aux admins depuis la Phase 0 (exposait toutes les données RH sans auth).
+app.get('/conges/debug/all', requireAdmin, async (req, res) => {
   const all = await pool.query('SELECT * FROM conges JOIN employees ON conges.employee_id = employees.id')
   res.json(all.rows)
 })
+
+module.exports = app

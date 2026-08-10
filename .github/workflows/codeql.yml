@@ -13,7 +13,7 @@ name: "CodeQL Advanced"
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "dev-lpa" ]
   pull_request:
     branches: [ "main" ]
   schedule:

@@ -70,3 +70,25 @@ describe.each([
     expect(res.body.target).toBe(expectedTarget)
   })
 })
+
+describe('error handler middleware', () => {
+  test('renvoie une erreur 500 JSON quand un handler pousse une exception', () => {
+    const errorLayer = app._router.stack.find(layer => layer.handle.length === 4)
+    expect(errorLayer).toBeTruthy()
+
+    const req = {}
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    }
+    const next = jest.fn()
+
+    errorLayer.handle(new Error('boom'), req, res, next)
+
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      error: 'boom',
+      stack: expect.any(String),
+    }))
+  })
+})

@@ -42,6 +42,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message, stack: err.stack })
 })
 
+/* istanbul ignore next */
 if (require.main === module) {
   app.listen(3000, () => {
     console.log('API Gateway running on :3000')

@@ -1,0 +1,57 @@
+name: HRFlow Security
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - dev-lpa
+
+  pull_request:
+    branches:
+      - main
+      - master
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    name: Dependency audit (${{ matrix.name }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: auth
+            path: services/auth
+          - name: paie
+            path: services/paie
+          - name: conges
+            path: services/conges
+          - name: recrutement
+            path: services/recrutement
+          - name: api-gateway
+            path: services/api-gateway
+          - name: frontend
+            path: frontend
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.path }}
+        run: npm install
+
+      - name: Audit production dependencies
+        working-directory: ${{ matrix.path }}
+        run: npm audit --omit=dev --audit-level=high

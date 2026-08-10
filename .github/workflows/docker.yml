@@ -1,0 +1,55 @@
+name: HRFlow Docker
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+  pull_request:
+    branches:
+      - main
+      - master
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hrflow-docker-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-build:
+    name: Docker build (${{ matrix.name }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: auth
+            dockerfile: docker/back/auth/Dockerfile
+
+          - name: paie
+            dockerfile: docker/back/paie/Dockerfile
+
+          - name: conges
+            dockerfile: docker/back/conges/Dockerfile
+
+          - name: recrutement
+            dockerfile: docker/back/recrutement/Dockerfile
+
+          - name: api-gateway
+            dockerfile: docker/back/api-gateway/Dockerfile
+
+          - name: frontend
+            dockerfile: docker/front/Dockerfile
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -f ${{ matrix.dockerfile }} .

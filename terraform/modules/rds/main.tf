@@ -4,7 +4,7 @@
 
 resource "aws_db_subnet_group" "postgres" {
   name       = "${var.project_name}-postgres-subnet-group"
-  subnet_ids = var.private_subnet_ids
+  subnet_ids = var.subnet_ids
 
   tags = {
     Name = "${var.project_name}-postgres-subnet-group"

@@ -14,9 +14,8 @@ module "network" {
   vpc_name = var.vpc_name
   vpc_cidr = var.vpc_cidr
 
-  availability_zones   = var.availability_zones
-  public_subnet_cidrs  = var.public_subnet_cidrs
-  private_subnet_cidrs = var.private_subnet_cidrs
+  availability_zones  = var.availability_zones
+  public_subnet_cidrs = var.public_subnet_cidrs
 }
 
 # ============================================================
@@ -40,21 +39,21 @@ module "ec2" {
 }
 
 # ============================================================
-# RDS POSTGRESQL
+# RDS POSTGRESQL - DISABLED FOR STUDY COST CONTROL
 # ============================================================
-
-module "rds" {
-  source = "./modules/rds"
-
-  project_name = var.project_name
-
-  vpc_id = module.network.vpc_id
-
-  private_subnet_ids = module.network.private_subnet_ids
-
-  ec2_security_group_id = module.ec2.security_group_id
-
-  database_name     = var.database_name
-  database_username = var.database_username
-  database_password = var.database_password
-}
+#
+# module "rds" {
+#   source = "./modules/rds"
+#
+#   project_name = var.project_name
+#
+#   vpc_id = module.network.vpc_id
+#
+#   subnet_ids = module.network.public_subnet_ids
+#
+#   ec2_security_group_id = module.ec2.security_group_id
+#
+#   database_name     = var.database_name
+#   database_username = var.database_username
+#   database_password = var.database_password
+# }

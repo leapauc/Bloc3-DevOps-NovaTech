@@ -17,11 +17,11 @@ variable "vpc_id" {
 }
 
 # ============================================================
-# PRIVATE SUBNETS
+# SUBNETS
 # ============================================================
 
-variable "private_subnet_ids" {
-  description = "IDs des private subnets utilisés par RDS"
+variable "subnet_ids" {
+  description = "IDs des subnets du VPC utilisés par le groupe RDS"
   type        = list(string)
 }
 

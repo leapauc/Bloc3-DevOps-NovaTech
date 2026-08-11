@@ -27,3 +27,25 @@ variable "private_subnet_cidrs" {
   description = "CIDR blocks for private subnets"
   type        = list(string)
 }
+
+# ============================================================
+# RDS
+# ============================================================
+
+variable "database_name" {
+  description = "Nom de la base PostgreSQL"
+  type        = string
+  default     = "novatech"
+}
+
+variable "database_username" {
+  description = "Utilisateur administrateur PostgreSQL"
+  type        = string
+  default     = "novatech_admin"
+}
+
+variable "database_password" {
+  description = "Mot de passe administrateur PostgreSQL"
+  type        = string
+  sensitive   = true
+}

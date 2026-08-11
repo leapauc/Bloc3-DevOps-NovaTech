@@ -8,8 +8,8 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "private_subnet_id" {
-  description = "ID du private subnet dans lequel déployer l'EC2"
+variable "public_subnet_id" {
+  description = "ID du public subnet dans lequel déployer l'EC2"
   type        = string
 }
 

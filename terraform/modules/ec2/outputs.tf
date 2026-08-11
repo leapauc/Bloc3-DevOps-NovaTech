@@ -1,15 +1,15 @@
 output "instance_id" {
-  description = "ID de l'instance K3s"
+  description = "ID de l'instance EC2 K3s"
   value       = aws_instance.k3s.id
 }
 
 output "private_ip" {
-  description = "Adresse IP privée de l'instance K3s"
+  description = "Adresse IP privée de l'EC2 K3s"
   value       = aws_instance.k3s.private_ip
 }
 
 output "security_group_id" {
-  description = "ID du Security Group K3s"
+  description = "Security Group de l'EC2 K3s"
   value       = aws_security_group.k3s.id
 }
 

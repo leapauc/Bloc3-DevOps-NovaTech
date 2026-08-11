@@ -18,3 +18,9 @@ private_subnet_cidrs = [
   "10.0.11.0/24",
   "10.0.12.0/24"
 ]
+
+project_name = "my-project"
+
+database_name     = "novatech"
+database_username = "novatech_admin"
+database_password = "CHANGE-MOI-AVEC-UN-MOT-DE-PASSE-FORT"

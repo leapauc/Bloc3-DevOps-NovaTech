@@ -112,6 +112,10 @@ services:
     environment:
       NODE_ENV: development
       CORS_ALLOWED_ORIGINS: http://localhost:3007
+
+      JWT_SECRET: dev_secret_local_only
+      JWT_REFRESH_SECRET: dev_refresh_secret_local_only
+
       AUTH_SERVICE_URL: http://auth:3001
       PAIE_SERVICE_URL: http://paie:3002
       CONGES_SERVICE_URL: http://conges:3003

@@ -10,7 +10,7 @@ module.exports = defineConfig({
   retries: 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: process.env.E2E_FRONTEND_URL || 'http://localhost:3005',
+    baseURL: process.env.E2E_FRONTEND_URL || 'http://localhost:3007',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

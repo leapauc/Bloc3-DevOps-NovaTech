@@ -29,6 +29,31 @@ variable "private_subnet_cidrs" {
 }
 
 # ============================================================
+# EC2
+# ============================================================
+
+variable "project_name" {
+  description = "Nom du projet"
+  type        = string
+}
+
+variable "ssh_allowed_cidr" {
+  description = "CIDR autorisé pour SSH vers l'EC2"
+  type        = string
+}
+
+variable "instance_type" {
+  description = "Type d'instance EC2"
+  type        = string
+  default     = "t4g.small"
+}
+
+variable "key_name" {
+  description = "Nom de la clé SSH AWS"
+  type        = string
+}
+
+# ============================================================
 # RDS
 # ============================================================
 

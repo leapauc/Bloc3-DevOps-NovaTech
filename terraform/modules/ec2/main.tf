@@ -128,7 +128,7 @@ resource "aws_instance" "k3s" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = var.instance_type
 
-  subnet_id = var.private_subnet_id
+  subnet_id = var.public_subnet_id
 
   key_name = var.key_name
 
@@ -136,7 +136,7 @@ resource "aws_instance" "k3s" {
     aws_security_group.k3s.id
   ]
 
-  associate_public_ip_address = false
+  associate_public_ip_address = true
 
   # ----------------------------------------------------------
   # ROOT DISK

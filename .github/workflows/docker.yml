@@ -3,10 +3,7 @@ name: HRFlow Docker
 on:
   push:
     branches:
-      - main
-      - master
-      - '**'
-
+      - '**'  # Toutes les branches
   pull_request:
     branches:
       - main
@@ -24,7 +21,7 @@ concurrency:
 jobs:
   docker-build:
     name: Docker build (${{ matrix.name }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: false
@@ -32,19 +29,14 @@ jobs:
         include:
           - name: auth
             dockerfile: docker/back/auth/Dockerfile
-
           - name: paie
             dockerfile: docker/back/paie/Dockerfile
-
           - name: conges
             dockerfile: docker/back/conges/Dockerfile
-
           - name: recrutement
             dockerfile: docker/back/recrutement/Dockerfile
-
           - name: api-gateway
             dockerfile: docker/back/api-gateway/Dockerfile
-
           - name: frontend
             dockerfile: docker/front/Dockerfile
 

@@ -3,10 +3,7 @@ name: HRFlow CI
 on:
   push:
     branches:
-      - main
-      - master
-      - '**'
-
+      - '**'  # Toutes les branches
   pull_request:
     branches:
       - main
@@ -24,7 +21,7 @@ concurrency:
 jobs:
   service-unit-tests:
     name: Service unit tests (${{ matrix.name }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: false
@@ -60,8 +57,8 @@ jobs:
 
   frontend-tests-and-build:
     name: Frontend tests and build
-    runs-on: ubuntu-latest
-    needs: service-unit-tests
+    runs-on: ubuntu-24.04
+    needs: service-unit-tests  # Attend la fin des tests unitaires
 
     steps:
       - name: Checkout source
@@ -84,10 +81,16 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist/
+
   e2e-tests:
     name: E2E tests
-    runs-on: ubuntu-latest
-    needs: frontend-tests-and-build
+    runs-on: ubuntu-24.04
+    needs: frontend-tests-and-build  # Attend le build du frontend
 
     steps:
       - name: Checkout source
@@ -108,15 +111,12 @@ jobs:
 
       - name: Create CI environment file
         run: cp .env.ci .env.local
-      
+
       - name: Reset database
         run: docker compose down -v
 
       - name: Start application with Docker Compose
         run: docker compose up -d --build
-
-      - name: Show Docker Compose services
-        run: docker compose ps
 
       - name: Wait for frontend
         run: |

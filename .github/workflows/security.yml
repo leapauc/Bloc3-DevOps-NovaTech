@@ -3,10 +3,7 @@ name: HRFlow Security
 on:
   push:
     branches:
-      - main
-      - master
-      - '**'
-
+      - '**'  # Toutes les branches
   pull_request:
     branches:
       - main
@@ -20,7 +17,7 @@ permissions:
 jobs:
   dependency-audit:
     name: Dependency audit (${{ matrix.name }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: false

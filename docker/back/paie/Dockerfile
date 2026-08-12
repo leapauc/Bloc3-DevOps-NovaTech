@@ -2,7 +2,7 @@ FROM node:22-alpine
 
 WORKDIR /app
 COPY services/paie/package*.json ./services/paie/
-RUN cd services/paie && npm install --omit=dev
+RUN cd services/paie && npm ci --omit=dev
 COPY services/paie/src ./services/paie/src
 
 EXPOSE 3002

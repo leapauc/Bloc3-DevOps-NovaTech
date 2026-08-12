@@ -1,5 +1,5 @@
 // Compte de démo créé par docker/init-db.sql — dev uniquement.
-const DEMO_USER = { email: 'admin@novatech.local', password: 'admin123', employeeId: 2 }
+const DEMO_USER = { email: 'admin@novatech.fr', password: '123456789', id: 1 }
 const API_URL = process.env.E2E_API_URL || 'http://localhost:3006/api'
 
 async function login(request) {

@@ -33,6 +33,8 @@ module "ec2" {
 
   ssh_allowed_cidr = var.ssh_allowed_cidr
 
+  monitoring_allowed_cidr = var.monitoring_allowed_cidr
+
   instance_type = var.instance_type
 
   key_name = var.key_name

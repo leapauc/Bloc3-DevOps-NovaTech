@@ -5,7 +5,6 @@ build/
 .env*
 !.env.pmn
 !.env.ci
-*package-lock.json
 *.terraform.lock.hcl
 *.terraform
 *terraform.tfvars

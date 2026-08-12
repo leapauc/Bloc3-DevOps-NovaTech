@@ -28,3 +28,8 @@ variable "key_name" {
   description = "Nom de la clé SSH AWS"
   type        = string
 }
+
+variable "monitoring_allowed_cidr" {
+  description = "CIDR allowed to access Grafana and Prometheus"
+  type        = string
+}

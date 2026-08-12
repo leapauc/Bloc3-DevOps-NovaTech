@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recrutement
+  namespace: hrflow
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: recrutement
+
+  template:
+    metadata:
+      labels:
+        app: recrutement
+
+    spec:
+      containers:
+        - name: recrutement
+          image: ghcr.io/TON_USER/hrflow-recrutement:latest
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 3004
+
+          envFrom:
+            - configMapRef:
+                name: hrflow-config
+
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hrflow-secrets
+                  key: POSTGRES_PASSWORD
+
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: hrflow-secrets
+                  key: DATABASE_URL
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  namespace: hrflow
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: auth
+
+  template:
+    metadata:
+      labels:
+        app: auth
+
+    spec:
+      containers:
+        - name: auth
+          image: ghcr.io/TON_USER/hrflow-auth:latest
+
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 3001
+
+          envFrom:
+            - configMapRef:
+                name: hrflow-config
+
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hrflow-secrets
+                  key: POSTGRES_PASSWORD
+
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: hrflow-secrets
+                  key: DATABASE_URL
+
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hrflow-secrets
+                  key: JWT_SECRET
+
+            - name: JWT_REFRESH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hrflow-secrets
+                  key: JWT_REFRESH_SECRET
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 20
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

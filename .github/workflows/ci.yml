@@ -116,7 +116,9 @@ jobs:
         run: docker compose down -v
 
       - name: Start application with Docker Compose
-        run: docker compose up -d --build
+        run: |
+          docker compose up -d --build
+          sleep 10
 
       - name: Wait for frontend
         run: |

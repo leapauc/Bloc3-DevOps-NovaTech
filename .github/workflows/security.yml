@@ -1,13 +1,7 @@
 name: HRFlow Security
 
 on:
-  workflow_run:
-    workflows: ["CodeQL Advanced"]  # Déclenche après CodeQL Advanced
-    types:
-      - completed
-    branches:
-      - '**'  # Toutes les branches
-
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -17,7 +11,6 @@ jobs:
   dependency-audit:
     name: Dependency audit (${{ matrix.name }})
     runs-on: ubuntu-24.04
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}  # Ne s'exécute que si CodeQL a réussi
 
     strategy:
       fail-fast: false
@@ -38,10 +31,10 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
 

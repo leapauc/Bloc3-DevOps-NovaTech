@@ -1,20 +1,7 @@
 name: "CodeQL Advanced"
 
 on:
-  push:
-    branches:
-      - '**'  # Toutes les branches
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.png'
-  pull_request:
-    branches:
-      - main
-      - master
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.png'
-
+  workflow_call:
   workflow_dispatch:
 
 jobs:

@@ -1,0 +1,48 @@
+name: HRFlow Pipeline
+
+on:
+  push:
+    branches:
+      - '**'
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.png'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.png'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  packages: read
+  actions: read
+
+jobs:
+  codeql:
+    uses: ./.github/workflows/codeql.yml
+    secrets: inherit
+
+  security:
+    uses: ./.github/workflows/security.yml
+    secrets: inherit
+
+  build-tests:
+    needs: [codeql, security]
+    uses: ./.github/workflows/build-tests.yml
+    secrets: inherit
+
+  docker:
+    needs: build-tests
+    uses: ./.github/workflows/docker.yml
+    secrets: inherit
+
+  deploy:
+    needs: docker
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit

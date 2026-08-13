@@ -1,0 +1,86 @@
+name: HRFlow CI Gate
+
+on:
+  workflow_run:
+    workflows:
+      - HRFlow Security
+      - CodeQL Advanced
+      - HRFlow Build-Tests
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  gate:
+    name: Validate CI
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check required workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          echo "Commit vérifié : $SHA"
+          echo
+
+          check_workflow() {
+            local workflow_file="$1"
+            local workflow_name="$2"
+
+            echo "========================================"
+            echo "Vérification : $workflow_name"
+            echo "========================================"
+
+            run=$(gh api \
+              "/repos/${REPOSITORY}/actions/workflows/${workflow_file}/runs?head_sha=${SHA}&per_page=100" \
+              --jq "[.workflow_runs[] | select(.head_sha == \"${SHA}\") | select(.event == \"push\")] | sort_by(.created_at) | last")
+
+            if [ "$run" = "null" ] || [ -z "$run" ]; then
+              echo "❌ Aucun run trouvé pour $workflow_name"
+              exit 1
+            fi
+
+            status=$(echo "$run" | jq -r '.status')
+            conclusion=$(echo "$run" | jq -r '.conclusion')
+            run_sha=$(echo "$run" | jq -r '.head_sha')
+            run_id=$(echo "$run" | jq -r '.id')
+
+            echo "Run ID     : $run_id"
+            echo "Status     : $status"
+            echo "Conclusion : $conclusion"
+            echo "SHA        : $run_sha"
+            echo
+
+            if [ "$run_sha" != "$SHA" ]; then
+              echo "❌ SHA différent"
+              exit 1
+            fi
+
+            if [ "$status" != "completed" ]; then
+              echo "⏳ $workflow_name n'est pas encore terminé"
+              exit 1
+            fi
+
+            if [ "$conclusion" != "success" ]; then
+              echo "❌ $workflow_name a échoué"
+              exit 1
+            fi
+
+            echo "✅ $workflow_name est OK"
+            echo
+          }
+
+          check_workflow "security.yml" "HRFlow Security"
+          check_workflow "codeql.yml" "CodeQL Advanced"
+          check_workflow "build-tests.yml" "HRFlow Build-Tests"
+
+          echo "========================================"
+          echo "✅ TOUS LES WORKFLOWS SONT AU VERT"
+          echo "========================================"

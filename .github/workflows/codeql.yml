@@ -1,12 +1,13 @@
-name: "CodeQL Advanced"
+name: CodeQL Advanced
 
 on:
   push:
     branches:
-      - '**'  # Toutes les branches
+      - '**'
     paths-ignore:
       - '**/*.md'
       - '**/*.png'
+
   pull_request:
     branches:
       - main
@@ -17,10 +18,14 @@ on:
 
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+
     permissions:
       security-events: write
       packages: read

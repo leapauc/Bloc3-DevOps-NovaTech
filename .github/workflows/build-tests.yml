@@ -3,10 +3,11 @@ name: HRFlow Build-Tests
 on:
   push:
     branches:
-      - '**'  # Toutes les branches
+      - '**'
     paths-ignore:
       - '**/*.md'
       - '**/*.png'
+
   pull_request:
     branches:
       - main
@@ -35,18 +36,22 @@ jobs:
         include:
           - name: auth
             path: services/auth
+
           - name: paie
             path: services/paie
+
           - name: conges
             path: services/conges
+
           - name: recrutement
             path: services/recrutement
+
           - name: api-gateway
             path: services/api-gateway
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -64,11 +69,13 @@ jobs:
   frontend-tests-and-build:
     name: Frontend tests and build
     runs-on: ubuntu-24.04
-    needs: service-unit-tests  # Attend la fin des tests unitaires
+
+    needs:
+      - service-unit-tests
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -96,7 +103,9 @@ jobs:
   e2e-tests:
     name: E2E tests
     runs-on: ubuntu-24.04
-    needs: frontend-tests-and-build
+
+    needs:
+      - frontend-tests-and-build
 
     env:
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
@@ -106,7 +115,7 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4

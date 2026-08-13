@@ -44,9 +44,22 @@ Pour le développement local, créez un fichier `.env` à partir du fichier `.en
 Les secrets utilisés par les environnements CI/CD doivent être configurés dans les **GitHub Actions Secrets** du repository.
 
 ## Installation
+### en local
 ```bash
 docker compose --env-file .env.local up --build -d
 ```
+
+### documentation API via le conteneur docker
+L'api-gateway et les services ont chacun leur documentation :
+
+| Service | URL de la documentation Swagger |
+| --- | --- |
+| API Gateway | [http://localhost:3006/api-docs](http://localhost:3006/api-docs) |
+| Auth | [http://localhost:3001/api-docs](http://localhost:3001/api-docs) |
+| Congés | [http://localhost:3003/api-docs](http://localhost:3003/api-docs) |
+| Paie | [http://localhost:3002/api-docs](http://localhost:3002/api-docs) |
+| Recrutement | [http://localhost:3004/api-docs](http://localhost:3004/api-docs) |
+
 
 ## Déploiement
 Voir Théo.

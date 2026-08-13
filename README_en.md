@@ -3,11 +3,11 @@
 
 [🇫🇷 Français](README.md) · [🇬🇧 English](README_en.md)
 
-Plateforme de gestion RH pour les PME françaises.
+SaaS HR management platform for French SMEs.
 
-## 🛠️ Stack
+## 🛠️ Tech Stack
 
-| Domaine | Technologies |
+| Domain | Technologies |
 |---|---|
 | 🎨 **Frontend** | React 18 |
 | ⚙️ **Backend** | Node.js · Express |
@@ -29,25 +29,25 @@ Plateforme de gestion RH pour les PME françaises.
 
 ## Configuration
 
-Le projet utilise des variables d'environnement pour sa configuration.
+The project uses environment variables for its configuration.
 
-### Variables d'environnement
+### Environnement variables
 
-| Variable | Description | Exemple |
+| Variable | Description | Example |
 |---|---|---|
-| `NODE_ENV` | Environnement d'exécution | `test` |
-| `DB_NAME` | Nom de la base PostgreSQL | `hrflow_test` |
-| `DB_USER` | Utilisateur PostgreSQL | `hrflow` |
-| `DB_PORT` | Port PostgreSQL | `5434` |
-| `GATEWAY_HOST_PORT` | Port du gateway | `3006` |
-| `FRONTEND_HOST_PORT` | Port du frontend | `3007` |
-| `CORS_ALLOWED_ORIGINS` | Origines autorisées par le CORS | `http://localhost:3007` |
-| `REACT_APP_API_URL` | URL de l'API utilisée par le frontend | `http://localhost:3006/api` |
-| `JWT_EXPIRY` | Durée de validité du JWT | `24h` |
+| `NODE_ENV` | Runtime environnement | `test` |
+| `DB_NAME` | PostgreSQL database name | `hrflow_test` |
+| `DB_USER` | PostgreSQL user | `hrflow` |
+| `DB_PORT` | PostgreSQL port | `5434` |
+| `GATEWAY_HOST_PORT` | API Gateway port | `3006` |
+| `FRONTEND_HOST_PORT` | Frontend port | `3007` |
+| `CORS_ALLOWED_ORIGINS` | Origins allowed by CORS | `http://localhost:3007` |
+| `REACT_APP_API_URL` | API URL used by the frontend | `http://localhost:3006/api` |
+| `JWT_EXPIRY` | JWT validity duration | `24h` |
 
 ### Secrets
 
-Les variables suivantes sont sensibles et **ne doivent jamais être commitées dans le dépôt** :
+The following variables contain sensitive information and **must never be committed to the repository** :
 
 - `AWS_ACCESS_KEY_ID`
 - `AWS_REGION`
@@ -58,9 +58,9 @@ Les variables suivantes sont sensibles et **ne doivent jamais être commitées d
 - `REDIS_PASSWORD`
 - `STRIPE_SECRET_KEY`
 
-Pour le développement local, créez un fichier `.env` à partir du fichier `.env.example`.
+For local development, create a .env file based on the .env.example file.
 
-Les secrets utilisés par les environnements CI/CD doivent être configurés dans les **GitHub Actions Secrets** du repository.
+Secrets used by CI/CD environments must be configured in the repository's **GitHub Actions Secrets**.
 
 ## Installation
 ### en local
@@ -69,9 +69,9 @@ docker compose --env-file .env.local up --build -d
 ```
 
 ### documentation API via le conteneur docker
-L'api-gateway et les services ont chacun leur documentation :
+The API Gateway and each service provide their own Swagger documentation:
 
-| Service | URL de la documentation Swagger |
+| Service | Swagger Documentation URL |
 | --- | --- |
 | API Gateway | [http://localhost:3006/api-docs](http://localhost:3006/api-docs) |
 | Auth | [http://localhost:3001/api-docs](http://localhost:3001/api-docs) |
@@ -81,16 +81,16 @@ L'api-gateway et les services ont chacun leur documentation :
 
 
 ## Déploiement
-Voir Théo.
+See Théo.
 
 ## Architecture
 
 <p align="center">
-  <img src="./docs/imgs/architecture.png" alt="Architecture HRFlow" width="900">
+  <img src="./docs/imgs/architecture.png" alt="HRFlow Architecture" width="900">
 </p>
 
 ## Tests
 TODO
 
 ---
-*Dernière mise à jour : Août 2026*
+Last updated: August 2026

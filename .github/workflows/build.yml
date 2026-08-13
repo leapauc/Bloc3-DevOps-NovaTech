@@ -6,12 +6,14 @@ on:
       - '**'
     paths-ignore:
       - '**/*.md'
+      - '**/*.png'
   pull_request:
     branches:
       - main
       - master
     paths-ignore:
       - '**/*.md'
+      - '**/*.png'
   workflow_dispatch:
 
 permissions:

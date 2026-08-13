@@ -82,54 +82,9 @@ Voir Théo.
 
 ## Architecture
 
-
-
-```mermaid
-flowchart LR
-
-    U["👤 Utilisateur"]
-    F["🎨 React 18<br/>Frontend"]
-    G["🚪 API Gateway<br/>Node.js / Express"]
-
-    A["🔐 Auth"]
-    P["💰 Paie"]
-    C["🏖️ Congés"]
-    R["👥 Recrutement"]
-
-    DB[("🐘 PostgreSQL")]
-    REDIS[("⚡ Redis")]
-
-    T["🏗️ Terraform<br/>Infrastructure as Code"]
-    AWS["☁️ AWS"]
-
-    U --> F
-    F -->|"HTTP / REST"| G
-
-    G --> A
-    G --> P
-    G --> C
-    G --> R
-
-    A --> DB
-    P --> DB
-    C --> DB
-    R --> DB
-
-    A --> REDIS
-    P --> REDIS
-    C --> REDIS
-    R --> REDIS
-
-    T -.->|"Provisionne"| AWS
-    AWS -.-> F
-    AWS -.-> G
-    AWS -.-> A
-    AWS -.-> P
-    AWS -.-> C
-    AWS -.-> R
-    AWS -.-> DB
-    AWS -.-> REDIS
-```
+<p align="center">
+  <img src="./docs/imgs/architecture.png" alt="Architecture HRFlow" width="900">
+</p>
 
 ## Tests
 TODO

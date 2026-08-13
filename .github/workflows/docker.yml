@@ -1,12 +1,20 @@
 name: HRFlow Docker
 
 on:
-  workflow_run:
-    workflows: ["HRFlow Build-Tests"]  # Déclenche après la fin de build-tests.yml
-    types:
-      - completed
+  push:
     branches:
       - '**'
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.png'
+
+  pull_request:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.png'
 
   workflow_dispatch:
 
@@ -21,7 +29,6 @@ jobs:
   docker-build:
     name: Docker build (${{ matrix.name }})
     runs-on: ubuntu-24.04
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}  # Ne s'exécute que si build-tests.yml a réussi
 
     strategy:
       fail-fast: false

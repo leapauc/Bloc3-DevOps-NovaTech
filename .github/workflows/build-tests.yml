@@ -1,12 +1,19 @@
 name: HRFlow Build-Tests
 
 on:
-  workflow_run:
-    workflows: ["HRFlow Security", "CodeQL Advanced"]  # Déclenche après les deux workflows
-    types:
-      - completed
+  push:
     branches:
       - '**'  # Toutes les branches
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.png'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.png'
 
   workflow_dispatch:
 
@@ -21,7 +28,6 @@ jobs:
   service-unit-tests:
     name: Service unit tests (${{ matrix.name }})
     runs-on: ubuntu-24.04
-    if: ${{ github.event.workflow_run.conclusion == 'success' }} 
 
     strategy:
       fail-fast: false

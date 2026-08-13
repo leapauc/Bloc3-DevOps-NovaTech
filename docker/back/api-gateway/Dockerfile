@@ -1,9 +1,20 @@
 FROM node:22-alpine
 
-WORKDIR /app
-COPY services/api-gateway/package*.json ./services/api-gateway/
-RUN cd services/api-gateway && npm ci --omit=dev
-COPY services/api-gateway/src ./services/api-gateway/src
+# Définir le répertoire de travail comme /app/services/api-gateway
+WORKDIR /app/services/api-gateway
 
+# Copier les fichiers package.json et package-lock.json
+COPY services/api-gateway/package*.json ./
+
+# Installer les dépendances
+RUN npm ci --omit=dev
+
+# Copier le reste des fichiers
+COPY services/api-gateway/src ./src
+COPY services/api-gateway/swagger.js ./
+
+# Exposer le port
 EXPOSE 3000
-CMD ["node", "services/api-gateway/src/index.js"]
+
+# Lancer l'application depuis /app/services/api-gateway
+CMD ["node", "src/index.js"]

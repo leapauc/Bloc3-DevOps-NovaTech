@@ -1,9 +1,20 @@
 FROM node:22-alpine
 
-WORKDIR /app
-COPY services/auth/package*.json ./services/auth/
-RUN cd services/auth && npm ci --omit=dev
-COPY services/auth/src ./services/auth/src
+# Définir le répertoire de travail comme /app/services/auth
+WORKDIR /app/services/auth
 
+# Copier les fichiers package.json et package-lock.json
+COPY services/auth/package*.json ./
+
+# Installer les dépendances
+RUN npm ci --omit=dev
+
+# Copier le reste des fichiers
+COPY services/auth/src ./src
+COPY services/auth/swagger.js ./
+
+# Exposer le port
 EXPOSE 3001
-CMD ["node", "services/auth/src/index.js"]
+
+# Lancer l'application depuis /app/services/auth
+CMD ["node", "src/index.js"]

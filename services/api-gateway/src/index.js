@@ -35,12 +35,42 @@ app.use('/api/paie', requireAuth, createProxyMiddleware({ target: PAIE_URL, chan
 app.use('/api/conges', requireAuth, createProxyMiddleware({ target: CONGES_URL, changeOrigin: true, ...stripApiPrefix }))
 app.use('/api/recrutement', requireAuth, createProxyMiddleware({ target: RECRUTEMENT_URL, changeOrigin: true, ...stripApiPrefix }))
 
+/**
+ * @swagger
+ * tags:
+ *   name: API Gateway
+ *   description: Point d'entrée unique pour tous les microservices HRFlow
+ */
+
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Vérifie l'état de santé de l'API Gateway
+ *     description: Retourne un statut OK si l'API Gateway fonctionne correctement.
+ *     tags: [API Gateway]
+ *     responses:
+ *       200:
+ *         description: État de santé OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: ok
+ */
 app.get('/health', (req, res) => res.json({ status: 'ok' }))
 
 app.use((err, req, res, next) => {
   console.error(err.stack)
   res.status(500).json({ error: err.message, stack: err.stack })
 })
+
+// Intégration de Swagger
+const setupSwagger = require('../swagger');
+setupSwagger(app);
 
 /* istanbul ignore next */
 if (require.main === module) {

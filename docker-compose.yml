@@ -58,6 +58,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - "127.0.0.1:${AUTH_HOST_PORT:-3001}:3001"
     security_opt:
       - no-new-privileges:true
 
@@ -78,6 +80,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - "127.0.0.1:${PAIE_HOST_PORT:-3002}:3002"
     security_opt:
       - no-new-privileges:true
 
@@ -97,6 +101,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - "127.0.0.1:${CONGES_HOST_PORT:-3003}:3003"
     security_opt:
       - no-new-privileges:true
 
@@ -116,6 +122,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - "127.0.0.1:${RECRUTEMENT_HOST_PORT:-3004}:3004"
     security_opt:
       - no-new-privileges:true
 

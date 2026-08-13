@@ -21,6 +21,42 @@ const pool = new Pool({
 })
 
 // Login simple — à améliorer plus tard
+/**
+ * @swagger
+ * tags:
+ *   name: Auth
+ *   description: Endpoints pour l'authentification
+ */
+
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Connexion d'un utilisateur
+ *     description: Authentifie un utilisateur et retourne un token JWT.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *     responses:
+ *       200:
+ *         description: Connexion réussie. Retourne un token JWT et les informations de l'utilisateur.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       401:
+ *         description: Identifiants invalides.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Invalid credentials"
+ */
 app.post('/auth/login', async (req, res) => {
   const { email, password } = req.body
   const result = await pool.query(
@@ -40,15 +76,48 @@ app.post('/auth/login', async (req, res) => {
   res.json({ token, user: { id: user.id, email, role: user.role } })
 })
 
+/**
+ * @swagger
+ * /auth/verify:
+ *   post:
+ *     summary: Vérification d'un token JWT
+ *     description: Vérifie si un token JWT est valide et retourne les informations de l'utilisateur.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/VerifyTokenRequest'
+ *     responses:
+ *       200:
+ *         description: Token valide. Retourne les informations de l'utilisateur.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/VerifyTokenResponse'
+ *       401:
+ *         description: Token invalide ou expiré.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Invalid token"
+ */
 app.post('/auth/verify', (req, res) => {
   const { token } = req.body
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     res.json({ valid: true, user: decoded })
   } catch (e) {
-    res.status(401).json({ valid: false })
+    res.status(401).json({ valid: false, error: 'Invalid token' })
   }
 })
+
+// Intégration de Swagger
+const setupSwagger = require('../swagger');
+setupSwagger(app);
 
 /* istanbul ignore next -- démarrage réel du serveur, non exercé sous test (module require au lieu de lancé) */
 if (require.main === module) {

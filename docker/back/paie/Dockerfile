@@ -1,9 +1,20 @@
 FROM node:22-alpine
 
-WORKDIR /app
-COPY services/paie/package*.json ./services/paie/
-RUN cd services/paie && npm ci --omit=dev
-COPY services/paie/src ./services/paie/src
+# Définir le répertoire de travail comme /app/services/paie
+WORKDIR /app/services/paie
 
+# Copier les fichiers package.json et package-lock.json
+COPY services/paie/package*.json ./
+
+# Installer les dépendances
+RUN npm ci --omit=dev
+
+# Copier le reste des fichiers
+COPY services/paie/src ./src
+COPY services/paie/swagger.js ./
+
+# Exposer le port
 EXPOSE 3002
-CMD ["node", "services/paie/src/index.js"]
+
+# Lancer l'application depuis /app/services/paie
+CMD ["node", "src/index.js"]

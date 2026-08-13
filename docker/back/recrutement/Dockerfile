@@ -1,9 +1,20 @@
 FROM node:22-alpine
 
-WORKDIR /app
-COPY services/recrutement/package*.json ./services/recrutement/
-RUN cd services/recrutement && npm ci --omit=dev
-COPY services/recrutement/src ./services/recrutement/src
+# Définir le répertoire de travail comme /app/services/recrutement
+WORKDIR /app/services/recrutement
 
+# Copier les fichiers package.json et package-lock.json
+COPY services/recrutement/package*.json ./
+
+# Installer les dépendances
+RUN npm ci --omit=dev
+
+# Copier le reste des fichiers
+COPY services/recrutement/src ./src
+COPY services/recrutement/swagger.js ./
+
+# Exposer le port
 EXPOSE 3004
-CMD ["node", "services/recrutement/src/index.js"]
+
+# Lancer l'application depuis /app/services/recrutement
+CMD ["node", "src/index.js"]

@@ -2,11 +2,27 @@
 
 Plateforme de gestion RH pour les PME françaises.
 
-## Stack
-- Frontend : React 18
-- Backend : Node.js / Express
-- BDD : PostgreSQL + Redis
-- Infra : AWS
+## 🛠️ Stack
+
+| Domaine | Technologies |
+|---|---|
+| 🎨 **Frontend** | React 18 |
+| ⚙️ **Backend** | Node.js · Express |
+| 🗄️ **Database** | PostgreSQL |
+| ⚡ **Cache** | Redis |
+| ☁️ **Cloud** | AWS |
+| 🏗️ **Infrastructure as Code** | Terraform |
+
+<p align="center">
+  <img src="https://img.shields.io/badge/React_18-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" />
+  <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white" />
+  <img src="https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" />
+  <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" />
+  <img src="https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazonwebservices&logoColor=white" />
+  <img src="https://img.shields.io/badge/Terraform-844FBA?style=for-the-badge&logo=terraform&logoColor=white" />
+</p>
+
 
 ## Configuration
 

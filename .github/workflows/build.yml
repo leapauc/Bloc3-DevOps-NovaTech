@@ -7,6 +7,7 @@ on:
     paths-ignore:
       - '**/*.md'
       - '**/*.png'
+
   pull_request:
     branches:
       - main
@@ -14,6 +15,7 @@ on:
     paths-ignore:
       - '**/*.md'
       - '**/*.png'
+
   workflow_dispatch:
 
 permissions:
@@ -58,9 +60,10 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
 
       - name: Configure AWS credentials
+        if: github.ref == 'refs/heads/dev-lpa'
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           aws-region: ${{ secrets.AWS_REGION }}
@@ -68,11 +71,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Login to Amazon ECR
+        if: github.ref == 'refs/heads/dev-lpa'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
 
       - name: Ensure ECR repository exists
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' &&  github.ref == 'refs/heads/dev-lpa'
         run: |
           aws ecr describe-repositories \
             --repository-names "${{ matrix.repository }}" \
@@ -84,13 +88,20 @@ jobs:
 
       - name: Build Docker image
         run: |
+          IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${GITHUB_SHA}"
+
+          echo "Construction de $IMAGE"
+
           docker build \
             -f "${{ matrix.dockerfile }}" \
-            -t "${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${{ github.sha }}" \
+            -t "$IMAGE" \
             .
 
       - name: Push Docker image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev-lpa'
         run: |
-          docker push \
-            "${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${{ github.sha }}"
+          IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${GITHUB_SHA}"
+
+          echo "Push de $IMAGE"
+
+          docker push "$IMAGE"

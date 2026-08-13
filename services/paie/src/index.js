@@ -6,7 +6,13 @@ const jwt = require('jsonwebtoken')
 const app = express()
 app.disable('x-powered-by') // évite la fuite "Server: Express" (trouvé via le scan OWASP ZAP, stage security)
 app.use(express.json())
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const pool = new Pool({
+  host: process.env.DB_HOST || 'prod-db.novatech.internal',
+  port: process.env.DB_PORT || 5432,
+  database: process.env.DB_NAME || 'hrflow_prod',
+  user: process.env.DB_USER || 'hrflow_admin',
+  password: process.env.DB_PASSWORD,
+})
 
 // Défense en profondeur : exigé même si le service est atteint directement,
 // sans passer par le gateway (voir Phase 0 du plan de remédiation).

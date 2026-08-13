@@ -5,8 +5,13 @@ const { Pool } = require('pg')
 const app = express()
 app.disable('x-powered-by') // évite la fuite "Server: Express" (trouvé via le scan OWASP ZAP, stage security)
 app.use(express.json())
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-
+const pool = new Pool({
+  host: process.env.DB_HOST || 'prod-db.novatech.internal',
+  port: process.env.DB_PORT || 5432,
+  database: process.env.DB_NAME || 'hrflow_prod',
+  user: process.env.DB_USER || 'hrflow_admin',
+  password: process.env.DB_PASSWORD,
+})
 // Upload CV sans validation du type (Rayan — sept 2023)
 /* istanbul ignore next -- callback interne de multer, jamais invoqué directement (multer est mocké en test, voir __tests__/recrutement.test.js) */
 function cvFilename(req, file, cb) { cb(null, file.originalname) }

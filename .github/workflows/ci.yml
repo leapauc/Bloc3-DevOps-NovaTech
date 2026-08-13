@@ -90,7 +90,13 @@ jobs:
   e2e-tests:
     name: E2E tests
     runs-on: ubuntu-24.04
-    needs: frontend-tests-and-build  # Attend le build du frontend
+    needs: frontend-tests-and-build
+
+    env:
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
 
     steps:
       - name: Checkout source
@@ -109,16 +115,16 @@ jobs:
         working-directory: e2e
         run: npx playwright install --with-deps
 
-      - name: Create CI environment file
-        run: cp .env.ci .env.local
-
       - name: Reset database
-        run: docker compose down -v
+        run: docker compose --env-file .env.ci down -v
 
       - name: Start application with Docker Compose
         run: |
-          docker compose up -d --build
+          docker compose --env-file .env.ci up -d --build
           sleep 10
+
+      - name: Show running containers
+        run: docker compose --env-file .env.ci ps
 
       - name: Wait for frontend
         run: |
@@ -160,8 +166,8 @@ jobs:
 
       - name: Show Docker logs
         if: failure()
-        run: docker compose logs --no-color
+        run: docker compose --env-file .env.ci logs --no-color
 
       - name: Stop Docker Compose
         if: always()
-        run: docker compose down -v
+        run: docker compose --env-file .env.ci down -v

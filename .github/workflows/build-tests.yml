@@ -1,19 +1,12 @@
 name: HRFlow Build-Tests
 
 on:
-  push:
+  workflow_run:
+    workflows: ["HRFlow Security"]  # Déclenche après HRFlow Security
+    types:
+      - completed
     branches:
       - '**'  # Toutes les branches
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.png'
-  pull_request:
-    branches:
-      - main
-      - master
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.png'
 
   workflow_dispatch:
 
@@ -28,6 +21,7 @@ jobs:
   service-unit-tests:
     name: Service unit tests (${{ matrix.name }})
     runs-on: ubuntu-24.04
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}  # Ne s'exécute que si HRFlow Security a réussi
 
     strategy:
       fail-fast: false
@@ -46,10 +40,10 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
 
@@ -64,14 +58,15 @@ jobs:
   frontend-tests-and-build:
     name: Frontend tests and build
     runs-on: ubuntu-24.04
-    needs: service-unit-tests  # Attend la fin des tests unitaires
+    needs: service-unit-tests
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
 
@@ -88,7 +83,7 @@ jobs:
         run: npm run build
 
       - name: Upload frontend build
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: frontend-build
           path: frontend/dist/
@@ -97,6 +92,7 @@ jobs:
     name: E2E tests
     runs-on: ubuntu-24.04
     needs: frontend-tests-and-build
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     env:
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
@@ -106,10 +102,10 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
 
@@ -156,7 +152,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: playwright-report
           path: e2e/playwright-report/
@@ -164,7 +160,7 @@ jobs:
 
       - name: Upload Playwright test results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: playwright-test-results
           path: e2e/test-results/

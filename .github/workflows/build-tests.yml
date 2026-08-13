@@ -1,4 +1,4 @@
-name: HRFlow CI
+name: HRFlow Build-Tests
 
 on:
   push:
@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hrflow-ci-${{ github.workflow }}-${{ github.ref }}
+  group: hrflow-build-tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

@@ -3,7 +3,7 @@ name: HRFlow Deploy
 on:
   workflow_run:
     workflows:
-      - "HRFlow CI"
+      - "HRFlow Build-Tests"
       - "CodeQL Advanced"
       - "HRFlow Docker"
       - "HRFlow Security"

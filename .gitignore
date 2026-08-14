@@ -7,4 +7,4 @@ build/
 !.env.ci
 *.terraform.lock.hcl
 *.terraform
-*terraform.tfvars
+*secret.auto.tfvars

@@ -69,8 +69,3 @@ variable "database_password" {
   type        = string
   sensitive   = true
 }
-
-variable "monitoring_allowed_cidr" {
-  description = "CIDR allowed to access Grafana and Prometheus"
-  type        = string
-}

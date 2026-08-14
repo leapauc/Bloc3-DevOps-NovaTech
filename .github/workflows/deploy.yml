@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       instance_id: ${{ steps.tf-output.outputs.instance_id }}
+    env:
+      TF_VAR_database_password: ${{ secrets.DATABASE_PASSWORD }}
+      TF_VAR_ssh_allowed_cidr: ${{ secrets.SSH_ALLOWED_CIDR }}
     steps:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

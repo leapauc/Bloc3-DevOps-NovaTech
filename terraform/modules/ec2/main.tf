@@ -76,7 +76,7 @@ resource "aws_security_group" "k3s" {
     from_port   = 30000
     to_port     = 30000
     protocol    = "tcp"
-    cidr_blocks = [var.monitoring_allowed_cidr]
+    cidr_blocks = [var.ssh_allowed_cidr]
   }
 
   # Prometheus (NodePort)
@@ -85,7 +85,7 @@ resource "aws_security_group" "k3s" {
     from_port   = 30090
     to_port     = 30090
     protocol    = "tcp"
-    cidr_blocks = [var.monitoring_allowed_cidr]
+    cidr_blocks = [var.ssh_allowed_cidr]
   }
 
   # Node Exporter (VPC only)
@@ -315,7 +315,7 @@ echo "============================================================"
 echo "DOWNLOADING GRAFANA DASHBOARD 15757"
 echo "============================================================"
 mkdir -p /tmp/dashboards
-curl -s https://raw.githubusercontent.com/grafana/helm-charts/main/charts/grafana/dashboards/kubernetes-15757.json -o /tmp/dashboards/15757.json
+curl -s https://grafana.com/api/dashboards/15757/revisions/43/download/ -o /tmp/dashboards/15757.json
 
 # --- INSTALL KUBE-PROMETHEUS-STACK ---
 echo "============================================================"

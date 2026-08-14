@@ -5,6 +5,20 @@ output "aws_account_id" {
 }
 
 # ============================================================
+# BACKEND
+# ============================================================
+
+terraform {
+  backend "s3" {
+    bucket       = "hrflow-terraform-state-079716036671"
+    key          = "hrflow/terraform.tfstate"
+    region       = "eu-west-3"
+    encrypt      = true
+    use_lockfile = true
+  }
+}
+
+# ============================================================
 # NETWORK
 # ============================================================
 

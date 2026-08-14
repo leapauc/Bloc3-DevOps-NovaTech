@@ -27,6 +27,48 @@ data "aws_ami" "ubuntu" {
 }
 
 # ============================================================
+# IAM - SSM
+# ============================================================
+
+resource "aws_iam_role" "k3s_ssm" {
+  name = "${var.project_name}-k3s-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-k3s-ssm-role"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "k3s_ssm" {
+  role       = aws_iam_role.k3s_ssm.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "k3s" {
+  name = "${var.project_name}-k3s-instance-profile"
+  role = aws_iam_role.k3s_ssm.name
+
+  tags = {
+    Name = "${var.project_name}-k3s-instance-profile"
+  }
+}
+
+# ============================================================
 # SECURITY GROUP
 # ============================================================
 resource "aws_security_group" "k3s" {
@@ -129,6 +171,16 @@ resource "aws_instance" "k3s" {
   subnet_id     = var.public_subnet_id
   key_name      = var.key_name
 
+  # ----------------------------------------------------------
+  # IAM / SSM
+  # ----------------------------------------------------------
+
+  iam_instance_profile = aws_iam_instance_profile.k3s.name
+
+  # ----------------------------------------------------------
+  # NETWORK
+  # ----------------------------------------------------------
+
   vpc_security_group_ids = [aws_security_group.k3s.id]
   associate_public_ip_address = true
 
@@ -170,7 +222,30 @@ apt-get update -y
 apt-get install -y curl ca-certificates apt-transport-https jq unzip socat conntrack iptables bash-completion
 echo "System dependencies installed."
 
-# --- SWAP (for t4g.small) ---
+
+# ============================================================
+# AWS SSM AGENT
+# ============================================================
+
+echo "============================================================"
+echo "INSTALLING AWS SSM AGENT"
+echo "============================================================"
+
+if ! command -v amazon-ssm-agent >/dev/null 2>&1; then
+  snap install amazon-ssm-agent --classic
+fi
+
+systemctl enable amazon-ssm-agent
+systemctl restart amazon-ssm-agent
+
+echo "SSM Agent status:"
+systemctl status amazon-ssm-agent --no-pager || true
+
+# ============================================================
+# SWAP
+# ============================================================
+
+# --- SWAP ---
 echo "============================================================"
 echo "CONFIGURING SWAP"
 echo "============================================================"

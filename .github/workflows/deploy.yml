@@ -2,6 +2,10 @@ name: HRFlow Deploy
 
 on:
   workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -14,11 +18,21 @@ jobs:
   terraform:
     name: Provision infrastructure
     runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
     outputs:
       instance_id: ${{ steps.tf-output.outputs.instance_id }}
     env:
       TF_VAR_database_password: ${{ secrets.DATABASE_PASSWORD }}
       TF_VAR_ssh_allowed_cidr: ${{ secrets.SSH_ALLOWED_CIDR }}
+      TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+      TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+      TF_VAR_jwt_refresh_secret: ${{ secrets.JWT_REFRESH_SECRET }}
+      TF_VAR_redis_password: ${{ secrets.REDIS_PASSWORD }}
+      TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+      TF_VAR_cors_allowed_origins: ${{ vars.CORS_ALLOWED_ORIGINS }}
+      TF_VAR_db_name: ${{ vars.DB_NAME }}
+      TF_VAR_db_user: ${{ vars.DB_USER }}
+
     steps:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -33,9 +47,12 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
 
-      - name: Terraform Init
+      - name: Terraform init & select workspace
         working-directory: ./terraform
-        run: terraform init
+        run: |
+          terraform init
+          terraform workspace select "${{ inputs.environment }}" || \
+            terraform workspace new "${{ inputs.environment }}"
 
       - name: Terraform Validate
         working-directory: ./terraform
@@ -43,11 +60,11 @@ jobs:
 
       - name: Terraform Plan
         working-directory: ./terraform
-        run: terraform plan
+        run: terraform plan -var-file="${{ inputs.environment }}.tfvars"
 
       - name: Terraform Apply
         working-directory: ./terraform
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve -var-file="${{ inputs.environment }}.tfvars"
 
       - name: Get instance id
         id: tf-output

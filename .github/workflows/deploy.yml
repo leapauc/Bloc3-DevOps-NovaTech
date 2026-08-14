@@ -14,7 +14,6 @@ jobs:
   terraform:
     name: Provision infrastructure
     runs-on: ubuntu-24.04
-    if: github.ref == 'refs/heads/dev-lpa'
     outputs:
       instance_id: ${{ steps.tf-output.outputs.instance_id }}
     steps:

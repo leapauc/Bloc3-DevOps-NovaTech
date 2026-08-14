@@ -4,10 +4,8 @@ metadata:
   name: postgres
   namespace: hrflow
 spec:
-  type: ClusterIP
+  clusterIP: None   # headless, requis pour StatefulSet
   selector:
     app: postgres
   ports:
-    - name: postgres
-      port: 5432
-      targetPort: 5432
+    - port: 5432

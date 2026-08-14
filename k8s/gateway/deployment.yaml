@@ -5,54 +5,54 @@ metadata:
   namespace: hrflow
 spec:
   replicas: 2
-
   selector:
     matchLabels:
       app: gateway
-
   template:
     metadata:
       labels:
         app: gateway
-
     spec:
       containers:
         - name: gateway
-          image: ghcr.io/TON_USER/hrflow-gateway:latest
-          imagePullPolicy: Always
-
+          image: ${ECR_REGISTRY}/hrflow/api-gateway:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
-
           envFrom:
             - configMapRef:
                 name: hrflow-config
-
           env:
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: hrflow-secrets
                   key: JWT_SECRET
-
             - name: JWT_REFRESH_SECRET
               valueFrom:
                 secretKeyRef:
                   name: hrflow-secrets
                   key: JWT_REFRESH_SECRET
-
             - name: AUTH_SERVICE_URL
               value: http://auth:3001
-
             - name: PAIE_SERVICE_URL
               value: http://paie:3002
-
             - name: CONGES_SERVICE_URL
               value: http://conges:3003
-
             - name: RECRUTEMENT_SERVICE_URL
               value: http://recrutement:3004
-
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
           resources:
             requests:
               cpu: 50m

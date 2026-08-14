@@ -49,7 +49,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
 
       - name: Configure AWS credentials
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main'
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           aws-region: ${{ secrets.AWS_REGION }}
@@ -57,12 +57,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Login to Amazon ECR
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
 
       - name: Ensure ECR repository exists
-        if: github.event_name == 'push' &&  github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' &&  github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main'
         run: |
           aws ecr describe-repositories \
             --repository-names "${{ matrix.repository }}" \
@@ -73,7 +73,7 @@ jobs:
             --image-scanning-configuration scanOnPush=true
 
       - name: Build Docker image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main'
         run: |
           IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${GITHUB_SHA}"
 
@@ -85,7 +85,7 @@ jobs:
             .
 
       - name: Push Docker image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main'
         run: |
           IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${GITHUB_SHA}"
 

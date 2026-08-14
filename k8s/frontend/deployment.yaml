@@ -5,25 +5,42 @@ metadata:
   namespace: hrflow
 spec:
   replicas: 2
-
   selector:
     matchLabels:
       app: frontend
-
   template:
     metadata:
       labels:
         app: frontend
-
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/TON_USER/hrflow-frontend:latest
-          imagePullPolicy: Always
-
+          image: ${ECR_REGISTRY}/hrflow/frontend:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3005
-
+          env:
+            - name: PORT
+              value: "3005"
+            - name: HOST
+              value: "0.0.0.0"
+            - name: REACT_APP_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: hrflow-config
+                  key: REACT_APP_API_URL
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3005
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3005
+            initialDelaySeconds: 15
+            periodSeconds: 20
           resources:
             requests:
               cpu: 50m

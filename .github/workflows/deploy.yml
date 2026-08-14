@@ -2,16 +2,21 @@ name: HRFlow Deploy
 
 on:
   workflow_call:
-  workflow_dispatch:
 
 permissions:
   contents: read
 
-jobs:
-  deploy:
-    name: Deploy to production
-    runs-on: ubuntu-24.04
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  NAMESPACE: hrflow
 
+jobs:
+  terraform:
+    name: Provision infrastructure
+    runs-on: ubuntu-24.04
+    if: github.ref == 'refs/heads/dev-lpa'
+    outputs:
+      instance_id: ${{ steps.tf-output.outputs.instance_id }}
     steps:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -27,14 +32,164 @@ jobs:
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
 
       - name: Terraform Init
+        working-directory: ./terraform
         run: terraform init
 
       - name: Terraform Validate
+        working-directory: ./terraform
         run: terraform validate
 
       - name: Terraform Plan
+        working-directory: ./terraform
         run: terraform plan
 
       - name: Terraform Apply
-        if: success()
+        working-directory: ./terraform
         run: terraform apply -auto-approve
+
+      - name: Get instance id
+        id: tf-output
+        working-directory: ./terraform
+        run: echo "instance_id=$(terraform output -raw instance_id)" >> "$GITHUB_OUTPUT"
+        # ⚠️ Suppose un output `instance_id` dans ton module ec2 — à ajouter s'il n'existe pas encore.
+
+  deploy-k8s:
+    name: Deploy application to k3s
+    runs-on: ubuntu-24.04
+    needs: terraform
+    env:
+      INSTANCE_ID: ${{ needs.terraform.outputs.instance_id }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@3e0aec4d80787158d308d7b364cb1b702e7feb7f # v4
+
+      - name: Fetch kubeconfig via SSM
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["cat /etc/rancher/k3s/k3s.yaml"]' \
+            --query "Command.CommandId" --output text)
+
+          sleep 5
+
+          aws ssm get-command-invocation \
+            --instance-id "$INSTANCE_ID" \
+            --command-id "$COMMAND_ID" \
+            --query "StandardOutputContent" --output text > kubeconfig.yaml
+
+          # k3s.yaml pointe sur 127.0.0.1 par défaut, on le remplace par l'IP publique/privée de l'instance
+          INSTANCE_IP=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
+            --query "Reservations[0].Instances[0].PrivateIpAddress" --output text)
+          sed -i "s/127.0.0.1/$INSTANCE_IP/" kubeconfig.yaml
+
+          echo "KUBECONFIG=$PWD/kubeconfig.yaml" >> "$GITHUB_ENV"
+        # ⚠️ Nécessite : SSM Agent actif sur l'instance, rôle IAM avec ssm:SendCommand,
+        # et un runner qui peut atteindre l'IP privée (self-hosted, ou VPN/peering) — 
+        # sinon utilise l'IP publique + security group ouvert sur le port 6443 pour le runner GitHub-hosted.
+
+      - name: Wait for cluster
+        run: kubectl get nodes --request-timeout=30s
+
+      - name: Apply namespace
+        run: kubectl apply -f k8s/namespace.yaml
+
+      - name: Create/update ConfigMap
+        run: |
+          kubectl create configmap hrflow-config \
+            --namespace ${{ env.NAMESPACE }} \
+            --from-literal=NODE_ENV=production \
+            --from-literal=DB_HOST=postgres \
+            --from-literal=DB_PORT=5432 \
+            --from-literal=DB_NAME="${{ vars.DB_NAME }}" \
+            --from-literal=AUTH_SERVICE_URL=http://auth:3001 \
+            --from-literal=PAIE_SERVICE_URL=http://paie:3002 \
+            --from-literal=CONGES_SERVICE_URL=http://conges:3003 \
+            --from-literal=RECRUTEMENT_SERVICE_URL=http://recrutement:3004 \
+            --from-literal=REDIS_HOST=redis \
+            --from-literal=REDIS_PORT=6379 \
+            --from-literal=CORS_ALLOWED_ORIGINS="${{ vars.CORS_ALLOWED_ORIGINS }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create/update Secret
+        run: |
+          kubectl create secret generic hrflow-secrets \
+            --namespace ${{ env.NAMESPACE }} \
+            --from-literal=DB_USER="${{ vars.DB_USER }}" \
+            --from-literal=DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+            --from-literal=DATABASE_URL="postgresql://${{ vars.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/${{ vars.DB_NAME }}" \
+            --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            --from-literal=JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
+            --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create ECR pull secret
+        run: |
+          ECR_TOKEN=$(aws ecr get-login-password --region "${{ secrets.AWS_REGION }}")
+          kubectl create secret docker-registry ecr-pull-secret \
+            --namespace ${{ env.NAMESPACE }} \
+            --docker-server="${{ steps.ecr-registry.outputs.registry || '' }}" \
+            --docker-username=AWS \
+            --docker-password="$ECR_TOKEN" \
+            --dry-run=client -o yaml | kubectl apply -f -
+        # ⚠️ À garder seulement si containerd n'est pas déjà configuré avec le rôle IAM de l'instance.
+        # Ce token expire après 12h : si tu gardes ce secret, il faut soit redéployer régulièrement,
+        # soit ajouter un CronJob dédié au refresh.
+
+      - name: Deploy Postgres and Redis
+        run: |
+          kubectl apply -f k8s/postgres/
+          kubectl apply -f k8s/redis/
+          kubectl rollout status statefulset/postgres -n ${{ env.NAMESPACE }} --timeout=90s
+          kubectl rollout status statefulset/redis -n ${{ env.NAMESPACE }} --timeout=60s
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
+
+      - name: Substitute image variables and deploy backend services
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          for svc in auth paie conges recrutement; do
+            envsubst < k8s/$svc/deployment.yaml | kubectl apply -f -
+            kubectl apply -f k8s/$svc/service.yaml
+          done
+
+      - name: Wait for backend services
+        run: |
+          for svc in auth paie conges recrutement; do
+            kubectl rollout status deployment/$svc -n ${{ env.NAMESPACE }} --timeout=120s
+          done
+
+      - name: Deploy gateway
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          envsubst < k8s/gateway/deployment.yaml | kubectl apply -f -
+          kubectl apply -f k8s/gateway/service.yaml
+          kubectl rollout status deployment/gateway -n ${{ env.NAMESPACE }} --timeout=120s
+
+      - name: Deploy frontend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          envsubst < k8s/frontend/deployment.yaml | kubectl apply -f -
+          kubectl apply -f k8s/frontend/service.yaml
+          kubectl rollout status deployment/frontend -n ${{ env.NAMESPACE }} --timeout=120s
+
+      - name: Apply Ingress
+        run: kubectl apply -f k8s/ingress.yaml

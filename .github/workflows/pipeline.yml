@@ -4,16 +4,10 @@ on:
   push:
     branches:
       - '**'
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.png'
   pull_request:
     branches:
       - main
       - master
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.png'
   workflow_dispatch:
 
 permissions:
@@ -23,27 +17,64 @@ permissions:
   actions: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      skip_tests: ${{ steps.set-output.outputs.skip_tests }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Détecter les fichiers modifiés hors extensions ignorées
+        id: filter
+        uses: tj-actions/changed-files@v45
+        with:
+          files_ignore: |
+            **/*.yml
+            **/*.yaml
+            **/*.md
+            **/*.png
+
+      - name: Déterminer si les tests doivent être skip
+        id: set-output
+        run: |
+          if [ "${{ steps.filter.outputs.any_changed }}" = "false" ]; then
+            echo "skip_tests=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_tests=false" >> "$GITHUB_OUTPUT"
+          fi
+
   codeql:
+    needs: changes
+    if: needs.changes.outputs.skip_tests != 'true'
     uses: ./.github/workflows/codeql.yml
     secrets: inherit
 
   security:
+    needs: changes
+    if: needs.changes.outputs.skip_tests != 'true'
     uses: ./.github/workflows/security.yml
     secrets: inherit
 
   build-tests:
-    needs: [codeql, security]
+    needs: [changes, codeql, security]
+    if: needs.changes.outputs.skip_tests != 'true'
     uses: ./.github/workflows/build-tests.yml
     secrets: inherit
 
   docker:
     needs: build-tests
+    if: ${{ !cancelled() && !failure() }}
     uses: ./.github/workflows/docker.yml
     secrets: inherit
 
   deploy-staging:
     needs: docker
-    if: (startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main') && github.event_name == 'push'
+    if: >
+      ${{ !cancelled() && !failure() &&
+      (startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main') &&
+      github.event_name == 'push' }}
     uses: ./.github/workflows/deploy.yml
     with:
       environment: staging
@@ -51,7 +82,10 @@ jobs:
 
   deploy-production:
     needs: deploy-staging
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: >
+      ${{ !cancelled() && !failure() &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' }}
     uses: ./.github/workflows/deploy.yml
     with:
       environment: production

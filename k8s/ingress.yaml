@@ -14,6 +14,35 @@ spec:
     - http:
 
         paths:
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: auth
+                port:
+                  number: 3001
+          - path: /paie
+            pathType: Prefix
+            backend:
+              service:
+                name: paie
+                port:
+                  number: 3002
+          - path: /conges
+            pathType: Prefix
+            backend:
+              service:
+                name: conges
+                port:
+                  number: 3003
+          - path: /recrutement
+            pathType: Prefix
+            backend:
+              service:
+                name: recrutement
+                port:
+                  number: 3004
+        
           - path: /api
             pathType: Prefix
             backend:

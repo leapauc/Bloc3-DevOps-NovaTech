@@ -114,6 +114,26 @@ app.post('/auth/verify', (req, res) => {
     res.status(401).json({ valid: false, error: 'Invalid token' })
   }
 })
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Vérifie l'état de santé de l'API auth
+ *     description: Retourne un statut OK si l'API auth fonctionne correctement.
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: État de santé OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: ok
+ */
+app.get('/health', (req, res) => res.json({ status: 'ok' }))
 
 // Intégration de Swagger
 const setupSwagger = require('../swagger');

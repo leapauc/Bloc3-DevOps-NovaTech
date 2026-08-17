@@ -21,16 +21,6 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3005
-          env:
-            - name: PORT
-              value: "3005"
-            - name: HOST
-              value: "0.0.0.0"
-            - name: REACT_APP_API_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: hrflow-config
-                  key: REACT_APP_API_URL
           readinessProbe:
             httpGet:
               path: /

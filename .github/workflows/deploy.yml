@@ -122,15 +122,32 @@ jobs:
             --command-id "$COMMAND_ID" \
             --query "StandardOutputContent" --output text > kubeconfig.yaml
 
-          # k3s.yaml pointe sur 127.0.0.1 par défaut, on le remplace par l'IP publique/privée de l'instance
-          INSTANCE_IP=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
-            --query "Reservations[0].Instances[0].PrivateIpAddress" --output text)
-          sed -i "s/127.0.0.1/$INSTANCE_IP/" kubeconfig.yaml
-
+          # On garde 127.0.0.1 tel quel — le tunnel SSM (étape suivante) l'exposera localement sur le runner
           echo "KUBECONFIG=$PWD/kubeconfig.yaml" >> "$GITHUB_ENV"
-        # ⚠️ Nécessite : SSM Agent actif sur l'instance, rôle IAM avec ssm:SendCommand,
-        # et un runner qui peut atteindre l'IP privée (self-hosted, ou VPN/peering) — 
-        # sinon utilise l'IP publique + security group ouvert sur le port 6443 pour le runner GitHub-hosted.
+      
+      - name: Install Session Manager plugin
+        run: |
+          curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
+          sudo dpkg -i session-manager-plugin.deb
+
+      - name: Start SSM port-forward tunnel to k3s API
+        run: |
+          aws ssm start-session \
+            --target "$INSTANCE_ID" \
+            --document-name AWS-StartPortForwardingSession \
+            --parameters '{"portNumber":["6443"],"localPortNumber":["6443"]}' \
+            > ssm-tunnel.log 2>&1 &
+          echo "SSM_TUNNEL_PID=$!" >> "$GITHUB_ENV"
+
+          # Laisse le temps au tunnel de s'établir
+          for i in $(seq 1 10); do
+            if nc -z 127.0.0.1 6443 2>/dev/null; then
+              echo "Tunnel SSM établi sur le port 6443."
+              break
+            fi
+            echo "Attente du tunnel SSM... ($i/10)"
+            sleep 3
+          done
 
       - name: Wait for cluster
         run: kubectl get nodes --request-timeout=30s
@@ -227,3 +244,7 @@ jobs:
 
       - name: Apply Ingress
         run: kubectl apply -f k8s/ingress.yaml
+
+      - name: Close SSM tunnel
+        if: always()
+        run: kill "$SSM_TUNNEL_PID" || true

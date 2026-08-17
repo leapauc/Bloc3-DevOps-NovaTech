@@ -62,7 +62,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
 
       - name: Ensure ECR repository exists
-        if: github.event_name == 'push' &&  github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' &&  (github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main')
         run: |
           aws ecr describe-repositories \
             --repository-names "${{ matrix.repository }}" \
@@ -72,20 +72,30 @@ jobs:
             --image-tag-mutability IMMUTABLE \
             --image-scanning-configuration scanOnPush=true
 
-      - name: Build Docker image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main'
+      - name: Set up Docker Buildx
+        if: >
+          github.event_name == 'push' &&
+          (github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main')
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        if: >
+          github.event_name == 'push' &&
+          (github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main')
         run: |
           IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${GITHUB_SHA}"
 
-          echo "Construction de $IMAGE"
+          echo "Build et push de $IMAGE"
 
-          docker build \
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
             -f "${{ matrix.dockerfile }}" \
             -t "$IMAGE" \
+            --push \
             .
 
       - name: Push Docker image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main')
         run: |
           IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${GITHUB_SHA}"
 

@@ -3,7 +3,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: conges
-  namespace: hrflow
 spec:
   replicas: 2
   selector:

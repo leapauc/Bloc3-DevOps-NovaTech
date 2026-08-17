@@ -14,6 +14,8 @@ spec:
       labels:
         app: paie
     spec:
+      imagePullSecrets:
+        - name: ecr-pull-secret
       containers:
         - name: paie
           image: ${ECR_REGISTRY}/hrflow/paie:${IMAGE_TAG}

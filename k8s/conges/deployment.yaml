@@ -14,6 +14,8 @@ spec:
       labels:
         app: conges
     spec:
+      imagePullSecrets:
+        - name: ecr-pull-secret
       containers:
         - name: conges
           image: ${ECR_REGISTRY}/hrflow/conges:${IMAGE_TAG}

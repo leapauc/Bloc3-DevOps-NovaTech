@@ -13,6 +13,8 @@ spec:
       labels:
         app: frontend
     spec:
+      imagePullSecrets:
+        - name: ecr-pull-secret
       containers:
         - name: frontend
           image: ${ECR_REGISTRY}/hrflow/frontend:${IMAGE_TAG}

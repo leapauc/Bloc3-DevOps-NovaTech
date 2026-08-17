@@ -24,7 +24,7 @@ project_name = "my-project"
 # EC2 / K3S
 # ============================================================
 
-instance_type = "t4g.medium"
+instance_type = "t4g.large"
 
 key_name = "novatech-k3s-key"
 

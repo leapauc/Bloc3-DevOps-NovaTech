@@ -14,7 +14,7 @@ concurrency:
 jobs:
   docker-build:
     name: Docker build (${{ matrix.name }})
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm 
 
     strategy:
       fail-fast: false
@@ -62,7 +62,13 @@ jobs:
         uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
 
       - name: Ensure ECR repository exists
+<<<<<<< HEAD
         if: github.event_name == 'push' &&  (github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main')
+=======
+        if: >
+          github.event_name == 'push' &&
+          (github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main')
+>>>>>>> f15e8e928e4aab021232c922dbf507ef617c6767
         run: |
           aws ecr describe-repositories \
             --repository-names "${{ matrix.repository }}" \
@@ -84,6 +90,7 @@ jobs:
           (github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main')
         run: |
           IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${GITHUB_SHA}"
+<<<<<<< HEAD
 
           echo "Build et push de $IMAGE"
 
@@ -102,3 +109,12 @@ jobs:
           echo "Push de $IMAGE"
 
           docker push "$IMAGE"
+=======
+          echo "Build et push de $IMAGE"
+          docker buildx build \
+            --platform linux/arm64 \
+            -f "${{ matrix.dockerfile }}" \
+            -t "$IMAGE" \
+            --push \
+            .
+>>>>>>> f15e8e928e4aab021232c922dbf507ef617c6767

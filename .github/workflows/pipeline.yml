@@ -50,7 +50,7 @@ jobs:
     secrets: inherit
 
   deploy-production:
-    needs: docker
+    needs: deploy-staging
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/deploy.yml
     with:

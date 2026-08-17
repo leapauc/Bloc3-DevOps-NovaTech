@@ -14,7 +14,7 @@ concurrency:
 jobs:
   docker-build:
     name: Docker build (${{ matrix.name }})
-    runs-on: ubuntu-24.04-arm 
+    runs-on: ubuntu-24.04-arm
 
     strategy:
       fail-fast: false
@@ -89,22 +89,6 @@ jobs:
 
           echo "Build et push de $IMAGE"
 
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            -f "${{ matrix.dockerfile }}" \
-            -t "$IMAGE" \
-            --push \
-            .
-
-      - name: Push Docker image
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/dev-lpa' || github.ref == 'refs/heads/main')
-        run: |
-          IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${GITHUB_SHA}"
-
-          echo "Push de $IMAGE"
-
-          docker push "$IMAGE"
-          echo "Build et push de $IMAGE"
           docker buildx build \
             --platform linux/arm64 \
             -f "${{ matrix.dockerfile }}" \

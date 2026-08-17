@@ -245,7 +245,7 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           for svc in auth paie conges recrutement; do
-            envsubst < k8s/$svc/deployment.yaml | kubectl apply -f -
+            envsubst < k8s/$svc/deployment.yaml | kubectl apply -n ${{ env.NAMESPACE }} -f -
             kubectl apply -f k8s/$svc/service.yaml -n ${{ env.NAMESPACE }}
           done
 
@@ -260,7 +260,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          envsubst < k8s/gateway/deployment.yaml | kubectl apply -f -
+          envsubst < k8s/gateway/deployment.yaml | kubectl apply -n ${{ env.NAMESPACE }} -f -
           kubectl apply -f k8s/gateway/service.yaml -n ${{ env.NAMESPACE }}
           kubectl rollout status deployment/gateway -n ${{ env.NAMESPACE }} --timeout=120s
 
@@ -269,7 +269,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          envsubst < k8s/frontend/deployment.yaml | kubectl apply -f -
+          envsubst < k8s/frontend/deployment.yaml | kubectl apply -n ${{ env.NAMESPACE }} -f -
           kubectl apply -f k8s/frontend/service.yaml -n ${{ env.NAMESPACE }}
           kubectl rollout status deployment/frontend -n ${{ env.NAMESPACE }} --timeout=120s
 

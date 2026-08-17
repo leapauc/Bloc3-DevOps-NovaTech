@@ -43,7 +43,7 @@ jobs:
 
   deploy-staging:
     needs: docker
-    if: startsWith(github.ref, 'refs/heads/dev-') && github.event_name == 'push'
+    if: (startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main') && github.event_name == 'push'
     uses: ./.github/workflows/deploy.yml
     with:
       environment: staging

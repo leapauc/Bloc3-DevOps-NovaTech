@@ -21,11 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       skip_tests: ${{ steps.set-output.outputs.skip_tests }}
+      docker_changed: ${{ steps.docker-filter.outputs.any_changed }}
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # Détection des changements pour les tests
       - name: Détecter les fichiers modifiés hors extensions ignorées
         id: filter
         uses: tj-actions/changed-files@v45
@@ -44,6 +47,16 @@ jobs:
           else
             echo "skip_tests=false" >> "$GITHUB_OUTPUT"
           fi
+
+      # Détection spécifique aux fichiers Docker
+      - name: Détecter les modifications Docker
+        id: docker-filter
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            .github/workflows/docker.yml
+            **/Dockerfile
+            **/Dockerfile.*
 
   codeql:
     needs: changes
@@ -64,8 +77,11 @@ jobs:
     secrets: inherit
 
   docker:
-    needs: build-tests
-    if: ${{ !cancelled() && !failure() }}
+    needs: [build-tests, changes]
+    if: >
+      ${{ !cancelled() &&
+      !failure() &&
+      needs.changes.outputs.docker_changed == 'true' }}
     uses: ./.github/workflows/docker.yml
     secrets: inherit
 

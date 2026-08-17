@@ -12,7 +12,6 @@ permissions:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  NAMESPACE: hrflow
 
 jobs:
   terraform:
@@ -32,7 +31,6 @@ jobs:
       TF_VAR_cors_allowed_origins: ${{ vars.CORS_ALLOWED_ORIGINS }}
       TF_VAR_db_name: ${{ vars.DB_NAME }}
       TF_VAR_db_user: ${{ vars.DB_USER }}
-      NAMESPACE: hrflow-${{ inputs.environment }} 
 
     steps:
       - name: Checkout source
@@ -71,14 +69,15 @@ jobs:
         id: tf-output
         working-directory: ./terraform
         run: echo "instance_id=$(terraform output -raw instance_id)" >> "$GITHUB_OUTPUT"
-        # ⚠️ Suppose un output `instance_id` dans ton module ec2 — à ajouter s'il n'existe pas encore.
 
   deploy-k8s:
     name: Deploy application to k3s
     runs-on: ubuntu-24.04
     needs: terraform
+    environment: ${{ inputs.environment }}
     env:
       INSTANCE_ID: ${{ needs.terraform.outputs.instance_id }}
+      NAMESPACE: hrflow-${{ inputs.environment }}
     steps:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -123,9 +122,8 @@ jobs:
             --command-id "$COMMAND_ID" \
             --query "StandardOutputContent" --output text > kubeconfig.yaml
 
-          # On garde 127.0.0.1 tel quel — le tunnel SSM (étape suivante) l'exposera localement sur le runner
           echo "KUBECONFIG=$PWD/kubeconfig.yaml" >> "$GITHUB_ENV"
-      
+
       - name: Install Session Manager plugin
         run: |
           curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
@@ -140,7 +138,6 @@ jobs:
             > ssm-tunnel.log 2>&1 &
           echo "SSM_TUNNEL_PID=$!" >> "$GITHUB_ENV"
 
-          # Laisse le temps au tunnel de s'établir
           for i in $(seq 1 10); do
             if nc -z 127.0.0.1 6443 2>/dev/null; then
               echo "Tunnel SSM établi sur le port 6443."
@@ -152,6 +149,40 @@ jobs:
 
       - name: Wait for cluster
         run: kubectl get nodes --request-timeout=30s
+
+      - name: Install Traefik if missing
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml",
+              "if ! kubectl get deployment traefik -n kube-system >/dev/null 2>&1; then",
+              "  helm repo add traefik https://traefik.github.io/charts || true",
+              "  helm repo update",
+              "  helm upgrade --install traefik traefik/traefik --namespace kube-system --set ports.web.hostPort=80 --set hostNetwork=true --wait --timeout 120s",
+              "else",
+              "  echo Traefik already installed.",
+              "fi"
+            ]' \
+            --query "Command.CommandId" --output text)
+
+          echo "Waiting for Traefik install command to complete..."
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" || true
+
+          echo "--- stdout ---"
+          aws ssm get-command-invocation \
+            --instance-id "$INSTANCE_ID" \
+            --command-id "$COMMAND_ID" \
+            --query "StandardOutputContent" --output text
+
+          echo "--- stderr ---"
+          aws ssm get-command-invocation \
+            --instance-id "$INSTANCE_ID" \
+            --command-id "$COMMAND_ID" \
+            --query "StandardErrorContent" --output text
 
       - name: Apply namespace
         run: kubectl apply -f k8s/namespace.yaml

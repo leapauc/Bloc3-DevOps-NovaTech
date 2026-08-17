@@ -147,6 +147,8 @@ jobs:
             echo "Attente du tunnel SSM... ($i/10)"
             sleep 3
           done
+        # ⚠️ Si un job plus loin échoue par timeout kubectl sans raison apparente,
+        # vérifie ssm-tunnel.log — une session SSM peut se couper avant la fin du job.
 
       - name: Wait for cluster
         run: kubectl get nodes --request-timeout=30s
@@ -161,12 +163,15 @@ jobs:
               "if ! kubectl get deployment traefik -n kube-system >/dev/null 2>&1; then",
               "  helm repo add traefik https://traefik.github.io/charts || true",
               "  helm repo update",
-              "  helm upgrade --install traefik traefik/traefik --namespace kube-system --set ports.web.hostPort=80 --set hostNetwork=true --wait --timeout 120s",
+              "  helm upgrade --install traefik traefik/traefik --namespace kube-system --set ports.web.port=80 --set ports.web.hostPort=80 --set ports.websecure.port=443 --set ports.websecure.hostPort=443 --set hostNetwork=true --wait --timeout 120s",
               "else",
               "  echo Traefik already installed.",
               "fi"
             ]' \
             --query "Command.CommandId" --output text)
+          # ⚠️ Fix : containerPort (ports.web.port / ports.websecure.port) doit être
+          # identique au hostPort quand hostNetwork=true, sinon Helm rejette le chart
+          # avec "All hostPort must match their respective containerPort".
 
           echo "Waiting for Traefik install command to complete..."
           aws ssm wait command-executed \
@@ -192,7 +197,7 @@ jobs:
         run: |
           kubectl create configmap hrflow-config \
             --namespace ${{ env.NAMESPACE }} \
-            --from-literal=NODE_ENV=production \
+            --from-literal=NODE_ENV=${{ inputs.environment }} \
             --from-literal=DB_HOST=postgres \
             --from-literal=DB_PORT=5432 \
             --from-literal=DB_NAME="${{ vars.DB_NAME }}" \
@@ -254,6 +259,23 @@ jobs:
           for svc in auth paie conges recrutement; do
             kubectl rollout status deployment/$svc -n ${{ env.NAMESPACE }} --timeout=120s
           done
+
+      - name: Debug pods on failure
+        if: failure()
+        run: |
+          echo "--- pods (namespace ${{ env.NAMESPACE }}) ---"
+          kubectl get pods -n ${{ env.NAMESPACE }} -o wide
+          for svc in auth paie conges recrutement; do
+            echo "=== $svc : describe deployment ==="
+            kubectl describe deployment/$svc -n ${{ env.NAMESPACE }} || true
+            echo "=== $svc : describe pods ==="
+            kubectl get pods -n ${{ env.NAMESPACE }} -l app=$svc -o name | xargs -r -I{} kubectl describe {}
+            echo "=== $svc : logs ==="
+            kubectl logs -n ${{ env.NAMESPACE }} -l app=$svc --tail=50 --all-containers || true
+          done
+        # Vérifie en priorité : Pending + "Insufficient cpu/memory" (instance trop petite
+        # pour 2 replicas x 6 services), ImagePullBackOff (pull secret / tag manquant en ECR),
+        # ou CrashLoopBackOff (variables d'env / connexion Postgres-Redis en échec).
 
       - name: Deploy gateway
         env:

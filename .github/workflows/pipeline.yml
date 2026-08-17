@@ -36,6 +36,7 @@ jobs:
           files_ignore: |
             **/*.yml
             **/*.yaml
+            **/*.html
             **/*.md
             **/*.png
 

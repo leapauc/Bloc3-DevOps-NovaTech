@@ -176,6 +176,12 @@ resource "aws_instance" "k3s" {
   subnet_id     = var.public_subnet_id
   key_name      = var.key_name
 
+  # Par défaut, l'AWS provider ne remplace PAS l'instance quand user_data change
+  # (elle ne se réexécute pas non plus sur une instance déjà démarrée) : un
+  # correctif dans le script d'installation resterait donc silencieusement sans
+  # effet sur l'instance déjà en place tant qu'on ne force pas ce remplacement.
+  user_data_replace_on_change = true
+
   # ----------------------------------------------------------
   # IAM / SSM
   # ----------------------------------------------------------
@@ -236,15 +242,25 @@ echo "============================================================"
 echo "INSTALLING AWS SSM AGENT"
 echo "============================================================"
 
-if ! command -v amazon-ssm-agent >/dev/null 2>&1; then
+if ! snap list amazon-ssm-agent >/dev/null 2>&1; then
   snap install amazon-ssm-agent --classic
 fi
 
-systemctl enable amazon-ssm-agent
-systemctl restart amazon-ssm-agent
+# Le paquet snap Ubuntu (images cloud 24.04) enregistre l'agent sous ce nom
+# d'unité, pas "amazon-ssm-agent.service" (qui n'existe que pour le paquet
+# .deb historique). On détecte le vrai nom pour rester robuste si une future
+# AMI revient à l'agent packagé en .deb.
+SSM_UNIT="snap.amazon-ssm-agent.amazon-ssm-agent.service"
+if ! systemctl list-unit-files "$SSM_UNIT" --no-legend 2>/dev/null | grep -q .; then
+  SSM_UNIT="amazon-ssm-agent.service"
+fi
+echo "Unité systemd détectée pour l'agent SSM : $SSM_UNIT"
+
+systemctl enable "$SSM_UNIT"
+systemctl restart "$SSM_UNIT"
 
 echo "SSM Agent status:"
-systemctl status amazon-ssm-agent --no-pager || true
+systemctl status "$SSM_UNIT" --no-pager || true
 
 # ============================================================
 # SWAP

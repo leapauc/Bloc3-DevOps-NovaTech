@@ -84,7 +84,7 @@ resource "aws_security_group_rule" "alb_to_ec2_http" {
   protocol                 = "tcp"
   security_group_id        = module.ec2.security_group_id
   source_security_group_id = module.alb.security_group_id
-  description               = "HTTP depuis l'ALB uniquement"
+  description               = "HTTP depuis le load balancer uniquement"
 }
 
 output "rds_endpoint" {

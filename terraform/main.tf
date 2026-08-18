@@ -58,7 +58,7 @@ module "rds" {
   database_name     = var.database_name
   database_username = var.database_username
   database_password = var.database_password
-  instance_class     = var.rds_instance_class
+  instance_class    = var.rds_instance_class
 }
 
 # ============================================================
@@ -71,9 +71,9 @@ module "alb" {
   vpc_id       = module.network.vpc_id
   subnet_ids   = module.network.public_subnet_ids # >= 2 AZ requis par l'ALB
 
-  instance_id      = module.ec2.instance_id
-  target_port      = 80
-  certificate_arn  = var.certificate_arn
+  instance_id     = module.ec2.instance_id
+  target_port     = 80
+  certificate_arn = var.certificate_arn
 }
 
 # L'EC2 n'accepte le port 80 QUE depuis l'ALB (plus de 0.0.0.0/0 direct sur l'instance)
@@ -84,7 +84,7 @@ resource "aws_security_group_rule" "alb_to_ec2_http" {
   protocol                 = "tcp"
   security_group_id        = module.ec2.security_group_id
   source_security_group_id = module.alb.security_group_id
-  description               = "HTTP depuis le load balancer uniquement"
+  description              = "HTTP depuis le load balancer uniquement"
 }
 
 output "rds_endpoint" {

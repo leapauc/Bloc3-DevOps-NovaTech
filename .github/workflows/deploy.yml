@@ -29,10 +29,9 @@ jobs:
       # seule variable "database_password" est déclarée dans variables.tf)
       TF_VAR_database_password: ${{ secrets.DB_PASSWORD }}
       TF_VAR_ssh_allowed_cidr: ${{ secrets.SSH_ALLOWED_CIDR }}
-      TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
-      TF_VAR_jwt_refresh_secret: ${{ secrets.JWT_REFRESH_SECRET }}
-      TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
-      TF_VAR_cors_allowed_origins: ${{ vars.CORS_ALLOWED_ORIGINS }}
+      # JWT_SECRET / JWT_REFRESH_SECRET / STRIPE_SECRET_KEY / CORS_ALLOWED_ORIGINS ne sont
+      # pas des variables Terraform (aucune déclarée dans variables.tf) : elles ne sont
+      # consommées que plus bas, directement via secrets.*/vars.*, pour le ConfigMap/Secret k8s.
       # database_name / database_username doivent matcher les vars GH utilisées
       # plus bas pour le ConfigMap/Secret k8s, sinon Terraform et k8s divergent
       TF_VAR_database_name: ${{ vars.DB_NAME }}

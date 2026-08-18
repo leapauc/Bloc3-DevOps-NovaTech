@@ -1,6 +1,6 @@
 aws_region = "eu-west-3"
-vpc_name = "my-project-vpc-staging"
-vpc_cidr = "10.0.0.0/16"
+vpc_name   = "my-project-vpc-staging"
+vpc_cidr   = "10.0.0.0/16"
 availability_zones = [
   "eu-west-3a",
   "eu-west-3b"
@@ -18,15 +18,15 @@ project_name = "my-project"
 # ============================================================
 # EC2 / K3S
 # ============================================================
-instance_type = "t4g.large"
-key_name = "novatech-k3s-key"
+instance_type    = "t4g.large"
+key_name         = "novatech-k3s-key"
 ssh_allowed_cidr = "176.141.164.220/32"
 
 # ============================================================
 # RDS POSTGRESQL
 # ============================================================
-database_name     = "novatech"
-database_username = "novatech_admin"
+database_name      = "novatech"
+database_username  = "novatech_admin"
 rds_instance_class = "db.t4g.micro"
 
 # ============================================================

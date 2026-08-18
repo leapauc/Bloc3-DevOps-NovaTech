@@ -34,8 +34,8 @@ ssh_allowed_cidr = "176.141.164.220/32"
 # RDS POSTGRESQL
 # ============================================================
 
-database_name     = "novatech"
-database_username = "novatech_admin"
+database_name      = "novatech"
+database_username  = "novatech_admin"
 rds_instance_class = "db.t4g.micro"
 
 # ============================================================

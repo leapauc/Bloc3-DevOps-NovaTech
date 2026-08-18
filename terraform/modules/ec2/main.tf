@@ -76,69 +76,6 @@ resource "aws_security_group" "k3s" {
   description = "Security Group for K3s EC2"
   vpc_id      = var.vpc_id
 
-  # SSH
-  ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.ssh_allowed_cidr]
-  }
-
-  # Kubernetes API (VPC only)
-  ingress {
-    description = "Kubernetes API"
-    from_port   = 6443
-    to_port     = 6443
-    protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
-  }
-
-  # K3s Flannel VXLAN (VPC only)
-  ingress {
-    description = "K3s Flannel VXLAN"
-    from_port   = 8472
-    to_port     = 8472
-    protocol    = "udp"
-    cidr_blocks = ["10.0.0.0/16"]
-  }
-
-  # Grafana (NodePort)
-  ingress {
-    description = "Grafana"
-    from_port   = 30000
-    to_port     = 30000
-    protocol    = "tcp"
-    cidr_blocks = [var.ssh_allowed_cidr]
-  }
-
-  # Prometheus (NodePort)
-  ingress {
-    description = "Prometheus"
-    from_port   = 30090
-    to_port     = 30090
-    protocol    = "tcp"
-    cidr_blocks = [var.ssh_allowed_cidr]
-  }
-
-  # Node Exporter (VPC only)
-  ingress {
-    description = "Node Exporter"
-    from_port   = 9100
-    to_port     = 9100
-    protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
-  }
-
-  # Kubelet (VPC only)
-  ingress {
-    description = "Kubelet"
-    from_port   = 10250
-    to_port     = 10250
-    protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
-  }
-
   # Outbound
   egress {
     description = "Internet outbound"
@@ -151,6 +88,83 @@ resource "aws_security_group" "k3s" {
   tags = {
     Name = "${var.project_name}-k3s-sg"
   }
+}
+
+# Les règles d'ingress sont déclarées en ressources séparées (et non en blocs
+# `ingress {}` inline sur l'aws_security_group) car main.tf ajoute par ailleurs
+# sa propre règle (alb_to_ec2_http) sur ce même security group. Mélanger les deux
+# styles fait perdre à Terraform le contrôle de la liste : le bloc inline se
+# comporte comme la liste autoritaire et supprime silencieusement toute règle
+# ajoutée par un aws_security_group_rule externe au prochain apply.
+
+resource "aws_security_group_rule" "ssh" {
+  type              = "ingress"
+  security_group_id = aws_security_group.k3s.id
+  description       = "SSH"
+  from_port         = 22
+  to_port           = 22
+  protocol          = "tcp"
+  cidr_blocks       = [var.ssh_allowed_cidr]
+}
+
+resource "aws_security_group_rule" "k8s_api" {
+  type              = "ingress"
+  security_group_id = aws_security_group.k3s.id
+  description       = "Kubernetes API (VPC only)"
+  from_port         = 6443
+  to_port           = 6443
+  protocol          = "tcp"
+  cidr_blocks       = ["10.0.0.0/16"]
+}
+
+resource "aws_security_group_rule" "flannel_vxlan" {
+  type              = "ingress"
+  security_group_id = aws_security_group.k3s.id
+  description       = "K3s Flannel VXLAN (VPC only)"
+  from_port         = 8472
+  to_port           = 8472
+  protocol          = "udp"
+  cidr_blocks       = ["10.0.0.0/16"]
+}
+
+resource "aws_security_group_rule" "grafana" {
+  type              = "ingress"
+  security_group_id = aws_security_group.k3s.id
+  description       = "Grafana (NodePort)"
+  from_port         = 30000
+  to_port           = 30000
+  protocol          = "tcp"
+  cidr_blocks       = [var.ssh_allowed_cidr]
+}
+
+resource "aws_security_group_rule" "prometheus" {
+  type              = "ingress"
+  security_group_id = aws_security_group.k3s.id
+  description       = "Prometheus (NodePort)"
+  from_port         = 30090
+  to_port           = 30090
+  protocol          = "tcp"
+  cidr_blocks       = [var.ssh_allowed_cidr]
+}
+
+resource "aws_security_group_rule" "node_exporter" {
+  type              = "ingress"
+  security_group_id = aws_security_group.k3s.id
+  description       = "Node Exporter (VPC only)"
+  from_port         = 9100
+  to_port           = 9100
+  protocol          = "tcp"
+  cidr_blocks       = ["10.0.0.0/16"]
+}
+
+resource "aws_security_group_rule" "kubelet" {
+  type              = "ingress"
+  security_group_id = aws_security_group.k3s.id
+  description       = "Kubelet (VPC only)"
+  from_port         = 10250
+  to_port           = 10250
+  protocol          = "tcp"
+  cidr_blocks       = ["10.0.0.0/16"]
 }
 
 # ============================================================
@@ -172,7 +186,7 @@ resource "aws_instance" "k3s" {
   # NETWORK
   # ----------------------------------------------------------
 
-  vpc_security_group_ids = [aws_security_group.k3s.id]
+  vpc_security_group_ids      = [aws_security_group.k3s.id]
   associate_public_ip_address = true
 
   root_block_device {

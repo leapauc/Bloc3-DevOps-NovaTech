@@ -3,10 +3,8 @@ kind: Service
 metadata:
   name: auth
 spec:
-  type: ClusterIP
   selector:
     app: auth
   ports:
-    - name: http
-      port: 3001
+    - port: 3001
       targetPort: 3001

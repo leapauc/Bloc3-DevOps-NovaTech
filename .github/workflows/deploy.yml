@@ -20,17 +20,23 @@ jobs:
     environment: ${{ inputs.environment }}
     outputs:
       instance_id: ${{ steps.tf-output.outputs.instance_id }}
+      rds_endpoint: ${{ steps.tf-output.outputs.rds_endpoint }}
+      alb_dns_name: ${{ steps.tf-output.outputs.alb_dns_name }}
     env:
-      TF_VAR_database_password: ${{ secrets.DATABASE_PASSWORD }}
+      # Un seul nom de var Terraform pour le mot de passe DB (avant : deux
+      # TF_VAR différents, database_password et db_password, alors qu'une
+      # seule variable "database_password" est déclarée dans variables.tf)
+      TF_VAR_database_password: ${{ secrets.DB_PASSWORD }}
       TF_VAR_ssh_allowed_cidr: ${{ secrets.SSH_ALLOWED_CIDR }}
-      TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
       TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
       TF_VAR_jwt_refresh_secret: ${{ secrets.JWT_REFRESH_SECRET }}
-      TF_VAR_redis_password: ${{ secrets.REDIS_PASSWORD }}
       TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
       TF_VAR_cors_allowed_origins: ${{ vars.CORS_ALLOWED_ORIGINS }}
-      TF_VAR_db_name: ${{ vars.DB_NAME }}
-      TF_VAR_db_user: ${{ vars.DB_USER }}
+      # database_name / database_username doivent matcher les vars GH utilisées
+      # plus bas pour le ConfigMap/Secret k8s, sinon Terraform et k8s divergent
+      TF_VAR_database_name: ${{ vars.DB_NAME }}
+      TF_VAR_database_username: ${{ vars.DB_USER }}
+      TF_VAR_certificate_arn: ${{ vars.ACM_CERTIFICATE_ARN }}
 
     steps:
       - name: Checkout source
@@ -65,10 +71,13 @@ jobs:
         working-directory: ./terraform
         run: terraform apply -auto-approve -var-file="${{ inputs.environment }}.tfvars"
 
-      - name: Get instance id
+      - name: Get terraform outputs
         id: tf-output
         working-directory: ./terraform
-        run: echo "instance_id=$(terraform output -raw instance_id)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "instance_id=$(terraform output -raw instance_id)" >> "$GITHUB_OUTPUT"
+          echo "rds_endpoint=$(terraform output -raw rds_endpoint)" >> "$GITHUB_OUTPUT"
+          echo "alb_dns_name=$(terraform output -raw alb_dns_name)" >> "$GITHUB_OUTPUT"
 
   deploy-k8s:
     name: Deploy application to k3s
@@ -77,6 +86,7 @@ jobs:
     environment: ${{ inputs.environment }}
     env:
       INSTANCE_ID: ${{ needs.terraform.outputs.instance_id }}
+      RDS_ENDPOINT: ${{ needs.terraform.outputs.rds_endpoint }}
       NAMESPACE: hrflow-${{ inputs.environment }}
     steps:
       - name: Checkout source
@@ -122,7 +132,6 @@ jobs:
             --command-id "$COMMAND_ID" \
             --query "StandardOutputContent" --output text > kubeconfig.yaml
 
-          # On garde 127.0.0.1 tel quel — le tunnel SSM (étape suivante) l'exposera localement sur le runner
           echo "KUBECONFIG=$PWD/kubeconfig.yaml" >> "$GITHUB_ENV"
 
       - name: Install Session Manager plugin
@@ -147,8 +156,6 @@ jobs:
             echo "Attente du tunnel SSM... ($i/10)"
             sleep 3
           done
-        # ⚠️ Si un job plus loin échoue par timeout kubectl sans raison apparente,
-        # vérifie ssm-tunnel.log — une session SSM peut se couper avant la fin du job.
 
       - name: Wait for cluster
         run: kubectl get nodes --request-timeout=30s
@@ -169,26 +176,16 @@ jobs:
               "fi"
             ]' \
             --query "Command.CommandId" --output text)
-          # ⚠️ Fix : containerPort (ports.web.port / ports.websecure.port) doit être
-          # identique au hostPort quand hostNetwork=true, sinon Helm rejette le chart
-          # avec "All hostPort must match their respective containerPort".
 
           echo "Waiting for Traefik install command to complete..."
           aws ssm wait command-executed \
             --command-id "$COMMAND_ID" \
             --instance-id "$INSTANCE_ID" || true
 
-          echo "--- stdout ---"
           aws ssm get-command-invocation \
             --instance-id "$INSTANCE_ID" \
             --command-id "$COMMAND_ID" \
             --query "StandardOutputContent" --output text
-
-          echo "--- stderr ---"
-          aws ssm get-command-invocation \
-            --instance-id "$INSTANCE_ID" \
-            --command-id "$COMMAND_ID" \
-            --query "StandardErrorContent" --output text
 
       - name: Apply namespace
         run: envsubst < k8s/namespace.yaml | kubectl apply -f -
@@ -198,7 +195,7 @@ jobs:
           kubectl create configmap hrflow-config \
             --namespace ${{ env.NAMESPACE }} \
             --from-literal=NODE_ENV=${{ inputs.environment }} \
-            --from-literal=DB_HOST=postgres \
+            --from-literal=DB_HOST="${{ env.RDS_ENDPOINT }}" \
             --from-literal=DB_PORT=5432 \
             --from-literal=DB_NAME="${{ vars.DB_NAME }}" \
             --from-literal=AUTH_SERVICE_URL=http://auth:3001 \
@@ -216,7 +213,7 @@ jobs:
             --namespace ${{ env.NAMESPACE }} \
             --from-literal=DB_USER="${{ vars.DB_USER }}" \
             --from-literal=DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
-            --from-literal=DATABASE_URL="postgresql://${{ vars.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/${{ vars.DB_NAME }}" \
+            --from-literal=DATABASE_URL="postgresql://${{ vars.DB_USER }}:${{ secrets.DB_PASSWORD }}@${{ env.RDS_ENDPOINT }}/${{ vars.DB_NAME }}" \
             --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
             --from-literal=JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
             --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
@@ -237,11 +234,10 @@ jobs:
             --docker-password="$ECR_TOKEN" \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Deploy Postgres and Redis
+      - name: Deploy Redis
         run: |
-          kubectl apply -f k8s/postgres/ -n ${{ env.NAMESPACE }}
+          # Postgres n'est plus déployé ici : on utilise désormais RDS (voir ConfigMap DB_HOST)
           kubectl apply -f k8s/redis/ -n ${{ env.NAMESPACE }}
-          kubectl rollout status statefulset/postgres -n ${{ env.NAMESPACE }} --timeout=90s
           kubectl rollout status statefulset/redis -n ${{ env.NAMESPACE }} --timeout=60s
 
       - name: Substitute image variables and deploy backend services
@@ -273,9 +269,6 @@ jobs:
             echo "=== $svc : logs ==="
             kubectl logs -n ${{ env.NAMESPACE }} -l app=$svc --tail=50 --all-containers || true
           done
-        # Vérifie en priorité : Pending + "Insufficient cpu/memory" (instance trop petite
-        # pour 2 replicas x 6 services), ImagePullBackOff (pull secret / tag manquant en ECR),
-        # ou CrashLoopBackOff (variables d'env / connexion Postgres-Redis en échec).
 
       - name: Deploy gateway
         env:
@@ -297,6 +290,10 @@ jobs:
 
       - name: Apply Ingress
         run: kubectl apply -f k8s/ingress.yaml -n ${{ env.NAMESPACE }}
+
+      - name: Show access endpoints
+        run: |
+          echo "Application disponible via l'ALB : http://${{ needs.terraform.outputs.alb_dns_name }}"
 
       - name: Close SSM tunnel
         if: always()

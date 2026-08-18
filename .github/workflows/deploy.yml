@@ -75,10 +75,19 @@ jobs:
         id: tf-output
         working-directory: ./terraform
         run: |
-          echo "instance_id=$(terraform output -raw instance_id)" >> "$GITHUB_OUTPUT"
-          echo "rds_endpoint=$(terraform output -raw rds_endpoint)" >> "$GITHUB_OUTPUT"
-          echo "rds_address=$(terraform output -raw rds_address)" >> "$GITHUB_OUTPUT"
-          echo "alb_dns_name=$(terraform output -raw alb_dns_name)" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          # Un output vide (ex: mauvais workspace, apply partiel) ne doit jamais
+          # continuer silencieusement : ça produirait un ConfigMap/Secret k8s avec
+          # des valeurs vides et un job postgres-init qui boucle jusqu'au timeout
+          # sans jamais dire pourquoi.
+          for name in instance_id rds_endpoint rds_address alb_dns_name; do
+            value="$(terraform output -raw "$name")"
+            if [ -z "$value" ]; then
+              echo "::error::terraform output '$name' est vide (workspace: $(terraform workspace show))." >&2
+              exit 1
+            fi
+            echo "${name}=${value}" >> "$GITHUB_OUTPUT"
+          done
 
   deploy-k8s:
     name: Deploy application to k3s

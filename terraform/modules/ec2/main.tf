@@ -407,11 +407,15 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 helm repo update
 
 # --- DOWNLOAD DASHBOARD 15757 JSON ---
-echo "============================================================"
-echo "DOWNLOADING GRAFANA DASHBOARD 15757"
-echo "============================================================"
+echo "Downloading Grafana dashboard 15757..."
 mkdir -p /tmp/dashboards
 curl -s https://grafana.com/api/dashboards/15757/revisions/43/download/ -o /tmp/dashboards/15757.json
+
+# --- WRITE CUSTOM HRFLOW DASHBOARD (latence P99, taux d'erreur, CPU/RAM, saturation) ---
+echo "Writing HRFlow observability dashboard..."
+cat > /tmp/dashboards/hrflow-observability.json <<'JSONEOF'
+${file("${path.module}/../../dashboards/hrflow-observability.json")}
+JSONEOF
 
 # --- INSTALL KUBE-PROMETHEUS-STACK ---
 echo "============================================================"
@@ -439,9 +443,9 @@ helm upgrade --install kube-prometheus-stack \
   --set prometheus.prometheusSpec.resources.limits.cpu=700m \
   --set prometheus.prometheusSpec.resources.limits.memory=768Mi \
   --set grafana.resources.requests.cpu=100m \
-  --set grafana.resources.requests.memory=128Mi \
+  --set grafana.resources.requests.memory=256Mi \
   --set grafana.resources.limits.cpu=500m \
-  --set grafana.resources.limits.memory=384Mi \
+  --set grafana.resources.limits.memory=768Mi \
   --set alertmanager.alertmanagerSpec.resources.requests.cpu=25m \
   --set alertmanager.alertmanagerSpec.resources.requests.memory=32Mi \
   --set alertmanager.alertmanagerSpec.resources.limits.cpu=100m \
@@ -454,10 +458,43 @@ helm upgrade --install kube-prometheus-stack \
   --set prometheus-node-exporter.resources.requests.memory=24Mi \
   --set prometheus-node-exporter.resources.limits.cpu=100m \
   --set prometheus-node-exporter.resources.limits.memory=64Mi \
-  --set grafana.dashboards.default.15757.json="$(base64 -w 0 /tmp/dashboards/15757.json)" \
   --wait=false
 
 echo "kube-prometheus-stack installation submitted."
+
+# --- CUSTOM GRAFANA DASHBOARDS CONFIGMAP ---
+# grafana.dashboards.<provider>.json ne pose pas le label grafana_dashboard=1 surveillé
+# par le sidecar (vérifié dans le chart) : jamais chargé. ConfigMap manuel + label à la place.
+echo "Applying custom Grafana dashboards ConfigMap..."
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+k3s kubectl create configmap hrflow-custom-dashboards -n monitoring \
+  --from-file=/tmp/dashboards/15757.json \
+  --from-file=/tmp/dashboards/hrflow-observability.json \
+  --dry-run=client -o yaml \
+  | k3s kubectl label --local -f - grafana_dashboard=1 -o yaml \
+  | k3s kubectl apply -f -
+
+# --- PODMONITOR TRAEFIK (Traefik arrive plus tard au 1er déploiement CD, 0 pod matché
+# au départ, pas une erreur. Label "release" requis par podMonitorSelectorNilUsesHelmValues) ---
+echo "Applying Traefik PodMonitor..."
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+cat <<'YAMLEOF' | k3s kubectl apply -f -
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: traefik
+  namespace: kube-system
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+YAMLEOF
 
 # --- WAIT FOR MONITORING PODS ---
 echo "============================================================"

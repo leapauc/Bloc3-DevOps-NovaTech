@@ -43,6 +43,17 @@ module "ec2" {
 }
 
 # ============================================================
+# MONITORING (alerte email si l'EC2 k3s ne répond plus)
+# ============================================================
+module "monitoring" {
+  source = "./modules/monitoring"
+
+  project_name = var.project_name
+  instance_id  = module.ec2.instance_id
+  alert_email  = var.alert_email
+}
+
+# ============================================================
 # RDS POSTGRESQL
 # ============================================================
 module "rds" {

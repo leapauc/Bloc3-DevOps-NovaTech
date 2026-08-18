@@ -51,6 +51,9 @@ jobs:
       # structurellement impossible que Terraform et le ConfigMap/Secret k8s divergent
       # (c'est cette divergence qui a forcé un remplacement de la RDS en préparation).
       TF_VAR_certificate_arn: ${{ vars.ACM_CERTIFICATE_ARN }}
+      # Pas une donnée sensible (pas d'identifiant/secret exploitable) : vars.*
+      # comme CORS_ALLOWED_ORIGINS/ACM_CERTIFICATE_ARN, pas secrets.*.
+      TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
 
     steps:
       - name: Checkout source
@@ -331,14 +334,80 @@ jobs:
             --query "Command.CommandId" --output text)
 
           echo "Waiting for Traefik install command to complete..."
+          # On ignore le code de sortie du wait ici : s'il échoue, on veut quand
+          # même récupérer stdout/stderr et le Status ci-dessous avant d'arrêter
+          # le job (cf. même pattern que "Fetch kubeconfig via SSM" plus haut).
           aws ssm wait command-executed \
             --command-id "$COMMAND_ID" \
             --instance-id "$INSTANCE_ID" || true
+
+          STATUS=$(aws ssm get-command-invocation \
+            --instance-id "$INSTANCE_ID" \
+            --command-id "$COMMAND_ID" \
+            --query "Status" --output text)
 
           aws ssm get-command-invocation \
             --instance-id "$INSTANCE_ID" \
             --command-id "$COMMAND_ID" \
             --query "StandardOutputContent" --output text
+
+          # Sans ce check, un échec silencieux ici (helm/kubectl en erreur) laissait
+          # le pipeline "vert" alors que Traefik restait absent/mal configuré ->
+          # 0 target ALB healthy -> 502 permanent, découvert seulement en prod.
+          if [ "$STATUS" != "Success" ]; then
+            echo "ERREUR : l'installation de Traefik a échoué (status: $STATUS)."
+            echo "--- stderr de la commande SSM ---"
+            aws ssm get-command-invocation \
+              --instance-id "$INSTANCE_ID" \
+              --command-id "$COMMAND_ID" \
+              --query "StandardErrorContent" --output text
+            exit 1
+          fi
+
+      - name: Verify Traefik is actually serving traffic
+        run: |
+          # Le rollout peut réussir (pod Running) sans que Traefik écoute
+          # correctement sur le hostPort 80 (ex: mauvaise config des ports du
+          # chart) : c'est exactement ce qui s'est produit en prod (pipeline
+          # vert, Traefik absent, ALB en 502 permanent). On vérifie donc
+          # directement, depuis le node lui-même via SSM, que quelque chose
+          # répond en HTTP sur :80 - le port 80 du node n'est routable que
+          # depuis le security group de l'ALB (cf alb_to_ec2_http dans
+          # terraform/main.tf), donc un curl direct depuis le runner GitHub
+          # Actions échouerait de toute façon, Traefik marchant ou non.
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "for i in $(seq 1 10); do",
+              "  CODE=$(curl -s -o /dev/null -w \"%{http_code}\" --max-time 5 http://localhost/ || echo 000);",
+              "  if [ \"$CODE\" != \"000\" ]; then echo TRAEFIK_UP code=$CODE; exit 0; fi;",
+              "  echo \"Traefik ne répond pas encore sur :80... ($i/10)\";",
+              "  sleep 5;",
+              "done",
+              "echo TRAEFIK_DOWN",
+              "exit 1"
+            ]' \
+            --query "Command.CommandId" --output text)
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" || true
+
+          STATUS=$(aws ssm get-command-invocation \
+            --instance-id "$INSTANCE_ID" \
+            --command-id "$COMMAND_ID" \
+            --query "Status" --output text)
+
+          aws ssm get-command-invocation \
+            --instance-id "$INSTANCE_ID" \
+            --command-id "$COMMAND_ID" \
+            --query "StandardOutputContent" --output text
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "ERREUR : Traefik ne répond pas sur le port 80 de l'instance après installation."
+            exit 1
+          fi
 
       - name: Apply namespace
         run: envsubst < k8s/namespace.yaml | kubectl apply -f -

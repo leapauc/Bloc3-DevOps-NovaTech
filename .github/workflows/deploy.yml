@@ -284,20 +284,46 @@ jobs:
       - name: Wait for cluster
         run: kubectl get nodes --request-timeout=30s
 
-      - name: Install Traefik if missing
+      - name: Install/upgrade Traefik
         run: |
+          # Toujours rejoué (idempotent via helm upgrade --install), et non plus
+          # seulement "si absent" : un ancien run avait laissé Traefik installé
+          # mais mal configuré (voir commentaires ci-dessous), et comme ce step
+          # ne faisait rien tant que le Deployment existait déjà, ce mauvais
+          # config restait en place indéfiniment malgré des pipelines "verts"
+          # (le pod traefik restait Pending, donc l'ALB avait 0 target healthy
+          # -> 502 permanent, sans que la pipeline ne le voie jamais).
+          #
+          # Trois réglages non-évidents nécessaires avec hostNetwork=true sur ce
+          # cluster k3s mono-noeud (chart traefik/traefik) :
+          #  - service.spec.type=ClusterIP : par défaut le chart crée un Service
+          #    de type LoadBalancer, ce qui sur k3s déclenche son ServiceLB
+          #    intégré (pod svclb-traefik) qui vient lui aussi bind les ports
+          #    hôte 80/443 -> conflit direct avec le pod traefik (hostNetwork)
+          #    qui veut les mêmes ports -> pod bloqué en Pending indéfiniment
+          #    ("didn't have free ports"). Inutile ici : le vrai load balancer
+          #    est l'ALB AWS, qui atteint déjà le node directement sur :80.
+          #  - ports.metrics.port=9101 : le port metrics par défaut du chart
+          #    (9100) rentre en conflit avec le node-exporter Prometheus déjà
+          #    présent sur le node (monitoring stack), pour la même raison
+          #    (hostNetwork expose tous les containerPort comme hostPort).
+          #  - podSecurityContext.runAsUser=0 + capabilities.drop=null : le
+          #    hardening par défaut du chart (uid non-root + drop ALL + ajout
+          #    explicite de CAP_NET_BIND_SERVICE) devrait suffire à bind le
+          #    port privilégié 80, mais échoue en pratique sur cette AMI/ce
+          #    kernel ARM64 ("bind: permission denied" même avec la capability
+          #    ajoutée). Compromis pragmatique : tourner en root sans drop de
+          #    capabilities plutôt que bloquer indéfiniment sur ce mystère.
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=[
               "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml",
-              "if ! kubectl get deployment traefik -n kube-system >/dev/null 2>&1; then",
-              "  helm repo add traefik https://traefik.github.io/charts || true",
-              "  helm repo update",
-              "  helm upgrade --install traefik traefik/traefik --namespace kube-system --set ports.web.port=80 --set ports.web.hostPort=80 --set ports.websecure.port=443 --set ports.websecure.hostPort=443 --set hostNetwork=true --wait --timeout 120s",
-              "else",
-              "  echo Traefik already installed.",
-              "fi"
+              "helm repo add traefik https://traefik.github.io/charts || true",
+              "helm repo update",
+              "helm upgrade --install traefik traefik/traefik --namespace kube-system --set ports.web.port=80 --set ports.web.hostPort=80 --set ports.websecure.port=443 --set ports.websecure.hostPort=443 --set ports.metrics.port=9101 --set hostNetwork=true --set service.spec.type=ClusterIP --set podSecurityContext.runAsNonRoot=false --set podSecurityContext.runAsUser=0 --set podSecurityContext.runAsGroup=0 --set securityContext.capabilities.drop=null --set securityContext.readOnlyRootFilesystem=false --wait --timeout 120s",
+              "kubectl delete pod -n kube-system -l app.kubernetes.io/name=traefik --field-selector=status.phase!=Running --ignore-not-found",
+              "kubectl rollout status deployment/traefik -n kube-system --timeout=120s"
             ]' \
             --query "Command.CommandId" --output text)
 

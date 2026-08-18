@@ -120,6 +120,52 @@ jobs:
             sleep 10
           done
 
+      - name: Wait for k3s installation to complete
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "for i in $(seq 1 60); do",
+              "  if [ -f /etc/rancher/k3s/k3s.yaml ]; then echo K3S_READY; exit 0; fi",
+              "  echo Attempt $i/60: waiting for k3s...",
+              "  sleep 15",
+              "done",
+              "echo TIMEOUT waiting for k3s",
+              "exit 1"
+            ]' \
+            --query "Command.CommandId" --output text)
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" || true
+
+          STATUS=$(aws ssm get-command-invocation \
+            --instance-id "$INSTANCE_ID" \
+            --command-id "$COMMAND_ID" \
+            --query "Status" --output text)
+
+          aws ssm get-command-invocation \
+            --instance-id "$INSTANCE_ID" \
+            --command-id "$COMMAND_ID" \
+            --query "StandardOutputContent" --output text
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "ERREUR : k3s n'a pas fini de s'installer à temps (status: $STATUS)."
+            echo "--- fin de /var/log/novatech-install.log sur l'instance ---"
+            LOG_CMD_ID=$(aws ssm send-command \
+              --instance-ids "$INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --parameters 'commands=["tail -n 100 /var/log/novatech-install.log || echo LOG_NOT_FOUND"]' \
+              --query "Command.CommandId" --output text)
+            aws ssm wait command-executed --command-id "$LOG_CMD_ID" --instance-id "$INSTANCE_ID" || true
+            aws ssm get-command-invocation \
+              --instance-id "$INSTANCE_ID" \
+              --command-id "$LOG_CMD_ID" \
+              --query "StandardOutputContent" --output text
+            exit 1
+          fi
+
       - name: Fetch kubeconfig via SSM
         run: |
           COMMAND_ID=$(aws ssm send-command \
@@ -128,12 +174,33 @@ jobs:
             --parameters 'commands=["cat /etc/rancher/k3s/k3s.yaml"]' \
             --query "Command.CommandId" --output text)
 
-          sleep 5
+          # On ignore le code de sortie du wait ici : s'il échoue, on veut quand
+          # même récupérer stdout/stderr ci-dessous avant d'arrêter le job.
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" || true
+
+          STATUS=$(aws ssm get-command-invocation \
+            --instance-id "$INSTANCE_ID" \
+            --command-id "$COMMAND_ID" \
+            --query "Status" --output text)
 
           aws ssm get-command-invocation \
             --instance-id "$INSTANCE_ID" \
             --command-id "$COMMAND_ID" \
             --query "StandardOutputContent" --output text > kubeconfig.yaml
+
+          if [ "$STATUS" != "Success" ] || [ ! -s kubeconfig.yaml ] || ! grep -q "apiVersion" kubeconfig.yaml; then
+            echo "ERREUR : la commande SSM a échoué (status: $STATUS)."
+            echo "--- stdout ---"
+            cat kubeconfig.yaml
+            echo "--- stderr de la commande SSM ---"
+            aws ssm get-command-invocation \
+              --instance-id "$INSTANCE_ID" \
+              --command-id "$COMMAND_ID" \
+              --query "StandardErrorContent" --output text
+            exit 1
+          fi
 
           echo "KUBECONFIG=$PWD/kubeconfig.yaml" >> "$GITHUB_ENV"
 

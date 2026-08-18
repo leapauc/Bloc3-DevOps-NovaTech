@@ -9,6 +9,16 @@ spec:
   rules:
     - http:
         paths:
+          # Doit être déclaré séparément de /api : le gateway sert sa doc Swagger
+          # agrégée à la racine /api-docs (pas sous /api/api-docs), sinon la règle
+          # / ci-dessous route ces requêtes vers le frontend au lieu du gateway.
+          - path: /api-docs
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 3000
           # A adapter si votre api-gateway ne sert pas déjà ses routes sous /api
           - path: /api
             pathType: Prefix

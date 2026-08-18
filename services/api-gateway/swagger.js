@@ -72,13 +72,32 @@ async function mergeSpecs() {
     ...(recrutementSpecs?.paths || {}),
   };
 
-  // Fusionner les composants (schemas, securitySchemes, etc.)
+  // Fusionner les composants (schemas, securitySchemes, etc.). Un simple spread des
+  // objets `components` ne suffit pas : chaque service a son propre sous-objet
+  // `schemas`, et spreader des `components` les uns après les autres REMPLACE ce
+  // sous-objet à chaque fois au lieu de le fusionner (dernier arrivé = seul survivant,
+  // ex. recrutement écrasait silencieusement les schémas de auth/paie/congés). Il faut
+  // fusionner explicitement chaque sous-clé (`schemas`, `securitySchemes`).
   mergedSpecs.components = {
     ...(mergedSpecs.components || {}),
     ...(authSpecs?.components || {}),
     ...(paieSpecs?.components || {}),
     ...(congesSpecs?.components || {}),
     ...(recrutementSpecs?.components || {}),
+    schemas: {
+      ...(mergedSpecs.components?.schemas || {}),
+      ...(authSpecs?.components?.schemas || {}),
+      ...(paieSpecs?.components?.schemas || {}),
+      ...(congesSpecs?.components?.schemas || {}),
+      ...(recrutementSpecs?.components?.schemas || {}),
+    },
+    securitySchemes: {
+      ...(mergedSpecs.components?.securitySchemes || {}),
+      ...(authSpecs?.components?.securitySchemes || {}),
+      ...(paieSpecs?.components?.securitySchemes || {}),
+      ...(congesSpecs?.components?.securitySchemes || {}),
+      ...(recrutementSpecs?.components?.securitySchemes || {}),
+    },
   };
 
   // Fusionner les tags

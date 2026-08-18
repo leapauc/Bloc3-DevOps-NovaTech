@@ -11,6 +11,9 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'hrflow_prod',
   user: process.env.DB_USER || 'hrflow_admin',
   password: process.env.DB_PASSWORD,
+  // RDS refuse les connexions non chiffrées (pg_hba.conf force SSL) ; en local
+  // (docker-compose, NODE_ENV=development) postgres:16-alpine n'a pas SSL activé.
+  ssl: process.env.NODE_ENV === 'development' ? false : { rejectUnauthorized: false },
 })
 
 /**

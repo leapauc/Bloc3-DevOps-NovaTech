@@ -18,7 +18,7 @@ public_subnet_cidrs = [
 # PROJECT
 # ============================================================
 
-project_name = "my-project"
+project_name = "hrflow-production"
 
 # ============================================================
 # EC2 / K3S

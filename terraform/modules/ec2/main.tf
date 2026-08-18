@@ -443,9 +443,9 @@ helm upgrade --install kube-prometheus-stack \
   --set prometheus.prometheusSpec.resources.limits.cpu=700m \
   --set prometheus.prometheusSpec.resources.limits.memory=768Mi \
   --set grafana.resources.requests.cpu=100m \
-  --set grafana.resources.requests.memory=128Mi \
+  --set grafana.resources.requests.memory=256Mi \
   --set grafana.resources.limits.cpu=500m \
-  --set grafana.resources.limits.memory=384Mi \
+  --set grafana.resources.limits.memory=768Mi \
   --set alertmanager.alertmanagerSpec.resources.requests.cpu=25m \
   --set alertmanager.alertmanagerSpec.resources.requests.memory=32Mi \
   --set alertmanager.alertmanagerSpec.resources.limits.cpu=100m \

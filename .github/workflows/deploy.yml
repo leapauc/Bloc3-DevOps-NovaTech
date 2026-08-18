@@ -51,6 +51,9 @@ jobs:
       # structurellement impossible que Terraform et le ConfigMap/Secret k8s divergent
       # (c'est cette divergence qui a forcé un remplacement de la RDS en préparation).
       TF_VAR_certificate_arn: ${{ vars.ACM_CERTIFICATE_ARN }}
+      # Pas une donnée sensible (pas d'identifiant/secret exploitable) : vars.*
+      # comme CORS_ALLOWED_ORIGINS/ACM_CERTIFICATE_ARN, pas secrets.*.
+      TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
 
     steps:
       - name: Checkout source

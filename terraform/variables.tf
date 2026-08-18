@@ -77,3 +77,16 @@ variable "environment" {
   type    = string
   default = "staging"
 }
+
+# ============================================================
+# MONITORING
+# ============================================================
+variable "alert_email" {
+  description = "Adresse email recevant les alertes de monitoring (SNS)"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_email))
+    error_message = "alert_email doit être une adresse email valide (TF_VAR_alert_email / vars.ALERT_EMAIL est-il bien défini côté GitHub Actions ?)."
+  }
+}

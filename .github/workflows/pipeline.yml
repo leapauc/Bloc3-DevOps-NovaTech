@@ -21,7 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       skip_tests: ${{ steps.set-output.outputs.skip_tests }}
-      docker_changed: ${{ steps.docker-filter.outputs.any_changed }}
 
     steps:
       - uses: actions/checkout@v4
@@ -47,16 +46,6 @@ jobs:
             echo "skip_tests=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Détection spécifique aux fichiers Docker
-      - name: Détecter les modifications Docker
-        id: docker-filter
-        uses: tj-actions/changed-files@v45
-        with:
-          files: |
-            .github/workflows/docker.yml
-            **/Dockerfile
-            **/Dockerfile.*
-
   codeql:
     needs: changes
     if: needs.changes.outputs.skip_tests != 'true'
@@ -75,12 +64,19 @@ jobs:
     uses: ./.github/workflows/build-tests.yml
     secrets: inherit
 
+  # docker.yml tague et déploie toujours avec le SHA du commit courant : il doit
+  # donc tourner (et pousser une image) à chaque push sur dev-*/main, même quand
+  # seul un fichier CI/Terraform a changé. Avant, ce job était sauté dès que
+  # aucun Dockerfile n'était modifié (docker_changed == 'true' requis) — un
+  # commit qui ne touchait ni Dockerfile ni docker.yml ne poussait alors aucune
+  # image pour son SHA, alors que deploy-staging/production continuaient (un job
+  # "skipped" n'est pas un "failure") et tentaient de pull une image jamais
+  # construite : ImagePullBackOff garanti sur les 4 services back.
   docker:
     needs: [build-tests, changes]
     if: >
       ${{ !cancelled() &&
-      !failure() &&
-      needs.changes.outputs.docker_changed == 'true' }}
+      !failure() }}
     uses: ./.github/workflows/docker.yml
     secrets: inherit
 

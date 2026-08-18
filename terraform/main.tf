@@ -95,6 +95,14 @@ output "rds_address" {
   value = module.rds.address
 }
 
+output "db_name" {
+  value = module.rds.db_name
+}
+
+output "db_username" {
+  value = var.database_username
+}
+
 output "alb_dns_name" {
   value = module.alb.dns_name
 }

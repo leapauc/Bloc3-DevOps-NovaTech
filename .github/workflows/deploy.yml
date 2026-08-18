@@ -10,6 +10,16 @@ on:
 permissions:
   contents: read
 
+# Sans ça, chaque push déclenche son propre run complet (pipeline.yml se lance sur
+# tout push) et rien n'empêche plusieurs déploiements de tourner en parallèle sur le
+# même environnement : ils se marchent dessus sur le même state Terraform et le même
+# cluster k8s, et le dernier à terminer "gagne", même s'il correspond à un commit plus
+# ancien. On annule les runs devenus obsolètes pour ce même environnement au profit du
+# plus récent.
+concurrency:
+  group: hrflow-deploy-${{ inputs.environment }}
+  cancel-in-progress: true
+
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
 
@@ -22,6 +32,8 @@ jobs:
       instance_id: ${{ steps.tf-output.outputs.instance_id }}
       rds_endpoint: ${{ steps.tf-output.outputs.rds_endpoint }}
       rds_address: ${{ steps.tf-output.outputs.rds_address }}
+      db_name: ${{ steps.tf-output.outputs.db_name }}
+      db_username: ${{ steps.tf-output.outputs.db_username }}
       alb_dns_name: ${{ steps.tf-output.outputs.alb_dns_name }}
     env:
       # Un seul nom de var Terraform pour le mot de passe DB (avant : deux
@@ -32,10 +44,12 @@ jobs:
       # JWT_SECRET / JWT_REFRESH_SECRET / STRIPE_SECRET_KEY / CORS_ALLOWED_ORIGINS ne sont
       # pas des variables Terraform (aucune déclarée dans variables.tf) : elles ne sont
       # consommées que plus bas, directement via secrets.*/vars.*, pour le ConfigMap/Secret k8s.
-      # database_name / database_username doivent matcher les vars GH utilisées
-      # plus bas pour le ConfigMap/Secret k8s, sinon Terraform et k8s divergent
-      TF_VAR_database_name: ${{ vars.DB_NAME }}
-      TF_VAR_database_username: ${{ vars.DB_USER }}
+      # database_name / database_username NE sont plus surchargés par des vars GitHub ici :
+      # Terraform (staging.tfvars / production.tfvars) est désormais la seule source de
+      # vérité. Le nom/utilisateur de la base sont republiés en outputs Terraform et lus
+      # depuis needs.terraform.outputs.db_name / db_username plus bas, pour qu'il soit
+      # structurellement impossible que Terraform et le ConfigMap/Secret k8s divergent
+      # (c'est cette divergence qui a forcé un remplacement de la RDS en préparation).
       TF_VAR_certificate_arn: ${{ vars.ACM_CERTIFICATE_ARN }}
 
     steps:
@@ -80,7 +94,7 @@ jobs:
           # continuer silencieusement : ça produirait un ConfigMap/Secret k8s avec
           # des valeurs vides et un job postgres-init qui boucle jusqu'au timeout
           # sans jamais dire pourquoi.
-          for name in instance_id rds_endpoint rds_address alb_dns_name; do
+          for name in instance_id rds_endpoint rds_address db_name db_username alb_dns_name; do
             value="$(terraform output -raw "$name")"
             if [ -z "$value" ]; then
               echo "::error::terraform output '$name' est vide (workspace: $(terraform workspace show))." >&2
@@ -95,9 +109,6 @@ jobs:
     needs: terraform
     environment: ${{ inputs.environment }}
     env:
-      INSTANCE_ID: ${{ needs.terraform.outputs.instance_id }}
-      RDS_ENDPOINT: ${{ needs.terraform.outputs.rds_endpoint }}
-      RDS_ADDRESS: ${{ needs.terraform.outputs.rds_address }}
       NAMESPACE: hrflow-${{ inputs.environment }}
     steps:
       - name: Checkout source
@@ -109,6 +120,41 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+
+      # needs.terraform.outputs.* peut arriver vide ici même quand le job terraform
+      # a réussi avec des valeurs non vides : c'est un bug de propagation des job
+      # outputs GitHub Actions (cf. actions/runner#2477), intermittent et sélectif
+      # (certains outputs passent, d'autres non, sur le même run). Plutôt que de
+      # dépendre de ce mécanisme pour des valeurs critiques, on relit directement
+      # le state Terraform (backend S3 distant, donc déjà persisté par le job
+      # terraform) : c'est la même source de vérité, sans le maillon fragile.
+      - name: Get terraform outputs from state
+        working-directory: ./terraform
+        run: |
+          set -euo pipefail
+          terraform init -input=false
+          terraform workspace select "${{ inputs.environment }}"
+
+          declare -A tf_to_env=(
+            [instance_id]=INSTANCE_ID
+            [rds_endpoint]=RDS_ENDPOINT
+            [rds_address]=RDS_ADDRESS
+            [db_name]=DB_NAME
+            [db_username]=DB_USERNAME
+            [alb_dns_name]=ALB_DNS_NAME
+          )
+          for tf_name in "${!tf_to_env[@]}"; do
+            env_name="${tf_to_env[$tf_name]}"
+            value="$(terraform output -raw "$tf_name")"
+            if [ -z "$value" ]; then
+              echo "::error::terraform output '$tf_name' est vide (workspace: $(terraform workspace show)) en le relisant depuis deploy-k8s." >&2
+              exit 1
+            fi
+            echo "${env_name}=${value}" >> "$GITHUB_ENV"
+          done
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@3e0aec4d80787158d308d7b364cb1b702e7feb7f # v4
@@ -275,7 +321,7 @@ jobs:
             --from-literal=NODE_ENV=${{ inputs.environment }} \
             --from-literal=DB_HOST="${{ env.RDS_ADDRESS }}" \
             --from-literal=DB_PORT=5432 \
-            --from-literal=DB_NAME="${{ vars.DB_NAME }}" \
+            --from-literal=DB_NAME="${{ env.DB_NAME }}" \
             --from-literal=AUTH_SERVICE_URL=http://auth:3001 \
             --from-literal=PAIE_SERVICE_URL=http://paie:3002 \
             --from-literal=CONGES_SERVICE_URL=http://conges:3003 \
@@ -289,9 +335,9 @@ jobs:
         run: |
           kubectl create secret generic hrflow-secrets \
             --namespace ${{ env.NAMESPACE }} \
-            --from-literal=DB_USER="${{ vars.DB_USER }}" \
+            --from-literal=DB_USER="${{ env.DB_USERNAME }}" \
             --from-literal=DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
-            --from-literal=DATABASE_URL="postgresql://${{ vars.DB_USER }}:${{ secrets.DB_PASSWORD }}@${{ env.RDS_ENDPOINT }}/${{ vars.DB_NAME }}" \
+            --from-literal=DATABASE_URL="postgresql://${{ env.DB_USERNAME }}:${{ secrets.DB_PASSWORD }}@${{ env.RDS_ENDPOINT }}/${{ env.DB_NAME }}" \
             --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
             --from-literal=JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
             --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
@@ -385,7 +431,7 @@ jobs:
 
       - name: Show access endpoints
         run: |
-          echo "Application disponible via l'ALB : http://${{ needs.terraform.outputs.alb_dns_name }}"
+          echo "Application disponible via l'ALB : http://${{ env.ALB_DNS_NAME }}"
 
       - name: Close SSM tunnel
         if: always()

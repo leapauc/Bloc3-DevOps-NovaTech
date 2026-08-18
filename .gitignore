@@ -2,5 +2,10 @@ node_modules/
 dist/
 build/
 .DS_Store
-.env
-*package-lock.json
+.env*
+!.env.pmn
+!.env.ci
+*.terraform
+*secret.auto.tfvars
+*.tfstate
+*.tfstate.*

@@ -1,0 +1,166 @@
+name: HRFlow Build-Tests
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hrflow-build-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  service-unit-tests:
+    name: Service unit tests (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: auth
+            path: services/auth
+          - name: paie
+            path: services/paie
+          - name: conges
+            path: services/conges
+          - name: recrutement
+            path: services/recrutement
+          - name: api-gateway
+            path: services/api-gateway
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Install service dependencies
+        working-directory: ${{ matrix.path }}
+        run: npm install
+
+      - name: Run Jest unit tests
+        working-directory: ${{ matrix.path }}
+        run: npm test -- --coverage --runInBand
+
+  frontend-tests-and-build:
+    name: Frontend tests and build
+    runs-on: ubuntu-24.04
+    needs: service-unit-tests  # Attend la fin des tests unitaires
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Run frontend unit tests
+        working-directory: frontend
+        run: npm test -- --watch=false --runInBand --coverage
+
+      - name: Build frontend production bundle
+        working-directory: frontend
+        run: npm run build
+
+      - name: Upload frontend build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: frontend-build
+          path: frontend/dist/
+
+  e2e-tests:
+    name: E2E tests
+    runs-on: ubuntu-24.04
+    needs: frontend-tests-and-build
+
+    env:
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Install E2E dependencies
+        working-directory: e2e
+        run: npm install
+
+      - name: Install Playwright browsers
+        working-directory: e2e
+        run: npx playwright install --with-deps
+
+      - name: Reset database
+        run: docker compose --env-file .env.ci down -v
+
+      - name: Start application with Docker Compose
+        run: |
+          docker compose --env-file .env.ci up -d --build
+          sleep 10
+
+      - name: Show running containers
+        run: docker compose --env-file .env.ci ps
+
+      - name: Wait for frontend
+        run: |
+          timeout 120 bash -c '
+            until curl -fsS http://localhost:3007 > /dev/null; do
+              echo "Waiting for frontend..."
+              sleep 3
+            done
+          '
+
+      - name: Wait for API Gateway
+        run: |
+          timeout 120 bash -c '
+            until curl -fsS http://localhost:3006/health > /dev/null; do
+              echo "Waiting for API Gateway..."
+              sleep 3
+            done
+          '
+
+      - name: Run Playwright E2E tests
+        working-directory: e2e
+        run: npm test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          if-no-files-found: ignore
+
+      - name: Upload Playwright test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-test-results
+          path: e2e/test-results/
+          if-no-files-found: ignore
+
+      - name: Show Docker logs
+        if: failure()
+        run: docker compose --env-file .env.ci logs --no-color
+
+      - name: Stop Docker Compose
+        if: always()
+        run: docker compose --env-file .env.ci down -v

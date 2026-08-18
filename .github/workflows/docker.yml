@@ -1,0 +1,97 @@
+name: HRFlow Docker
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hrflow-docker-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-build:
+    name: Docker build (${{ matrix.name }})
+    runs-on: ubuntu-24.04-arm
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: auth
+            dockerfile: docker/back/auth/Dockerfile
+            repository: hrflow/auth
+
+          - name: paie
+            dockerfile: docker/back/paie/Dockerfile
+            repository: hrflow/paie
+
+          - name: conges
+            dockerfile: docker/back/conges/Dockerfile
+            repository: hrflow/conges
+
+          - name: recrutement
+            dockerfile: docker/back/recrutement/Dockerfile
+            repository: hrflow/recrutement
+
+          - name: api-gateway
+            dockerfile: docker/back/api-gateway/Dockerfile
+            repository: hrflow/api-gateway
+
+          - name: frontend
+            dockerfile: docker/front/Dockerfile
+            repository: hrflow/frontend
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+
+      - name: Configure AWS credentials
+        if: startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main'
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Login to Amazon ECR
+        if: startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
+
+      - name: Ensure ECR repository exists
+        if: >
+          github.event_name == 'push' &&
+          (startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main')
+        run: |
+          aws ecr describe-repositories \
+            --repository-names "${{ matrix.repository }}" \
+            >/dev/null 2>&1 \
+          || aws ecr create-repository \
+            --repository-name "${{ matrix.repository }}" \
+            --image-tag-mutability IMMUTABLE \
+            --image-scanning-configuration scanOnPush=true
+
+      - name: Set up Docker Buildx
+        if: >
+          github.event_name == 'push' &&
+          (startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main')
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        if: >
+          github.event_name == 'push' &&
+          (startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main')
+        run: |
+          IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${GITHUB_SHA}"
+
+          echo "Build et push de $IMAGE"
+
+          docker buildx build \
+            --platform linux/arm64 \
+            -f "${{ matrix.dockerfile }}" \
+            -t "$IMAGE" \
+            --push \
+            .

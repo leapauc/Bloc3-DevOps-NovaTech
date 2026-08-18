@@ -110,6 +110,9 @@ jobs:
     environment: ${{ inputs.environment }}
     env:
       NAMESPACE: hrflow-${{ inputs.environment }}
+      # 2 réplicas par service en production (résilience/capacité sur le t4g.xlarge
+      # dédié), 1 seul en staging pour rester léger sur le t4g.large partagé.
+      REPLICAS: ${{ inputs.environment == 'production' && '2' || '1' }}
     steps:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

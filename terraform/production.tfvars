@@ -24,7 +24,7 @@ project_name = "hrflow-production"
 # EC2 / K3S
 # ============================================================
 
-instance_type = "t4g.large"
+instance_type = "t4g.xlarge"
 
 key_name = "novatech-k3s-key"
 

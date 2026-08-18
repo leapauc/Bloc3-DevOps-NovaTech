@@ -28,17 +28,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Détection des changements pour les tests
-      - name: Détecter les fichiers modifiés hors extensions ignorées
+      # Détection des changements pour les tests : uniquement e2e/, frontend/, services/
+      - name: Détecter les modifications dans e2e, frontend ou services
         id: filter
         uses: tj-actions/changed-files@v45
         with:
-          files_ignore: |
-            **/*.yml
-            **/*.yaml
-            **/*.html
-            **/*.md
-            **/*.png
+          files: |
+            e2e/**
+            frontend/**
+            services/**
 
       - name: Déterminer si les tests doivent être skip
         id: set-output

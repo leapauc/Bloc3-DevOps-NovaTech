@@ -94,7 +94,3 @@ output "rds_endpoint" {
 output "alb_dns_name" {
   value = module.alb.dns_name
 }
-
-provider "aws" {
-  region = var.aws_region
-}

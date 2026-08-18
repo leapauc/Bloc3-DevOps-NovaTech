@@ -10,7 +10,7 @@ resource "aws_db_subnet_group" "this" {
 # La base n'est jamais exposée publiquement : seule l'EC2 k3s peut lui parler
 resource "aws_security_group" "rds" {
   name        = "${var.project_name}-rds-sg"
-  description = "Autorise Postgres uniquement depuis l'EC2 k3s"
+  description = "Autorise Postgres uniquement depuis EC2 k3s"
   vpc_id      = var.vpc_id
 
   ingress {

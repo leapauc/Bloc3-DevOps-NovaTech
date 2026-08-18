@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-init
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: psql-init
+          image: postgres:16-alpine
+          envFrom:
+            - configMapRef:
+                name: hrflow-config
+            - secretRef:
+                name: hrflow-secrets
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "En attente que RDS accepte les connexions..."
+              until PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; do
+                echo "RDS pas encore prête, nouvelle tentative dans 5s..."
+                sleep 5
+              done
+              echo "Connexion OK, exécution du script d'init..."
+              PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f /init-scripts/init.sql
+              echo "Init terminée."
+          volumeMounts:
+            - name: init-sql
+              mountPath: /init-scripts
+      volumes:
+        - name: init-sql
+          configMap:
+            name: postgres-init

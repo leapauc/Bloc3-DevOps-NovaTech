@@ -91,6 +91,10 @@ output "rds_endpoint" {
   value = module.rds.endpoint
 }
 
+output "rds_address" {
+  value = module.rds.address
+}
+
 output "alb_dns_name" {
   value = module.alb.dns_name
 }

@@ -104,9 +104,27 @@ jobs:
         working-directory: e2e
         run: npm install
 
-      - name: Install Playwright browsers
+      - name: Get Playwright version
         working-directory: e2e
-        run: npx playwright install --with-deps
+        id: playwright-version
+        run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers (cache miss)
+        working-directory: e2e
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright OS deps only (cache hit)
+        working-directory: e2e
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       - name: Reset database
         run: docker compose --env-file .env.ci down -v

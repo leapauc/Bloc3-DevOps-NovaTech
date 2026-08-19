@@ -95,14 +95,19 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Skip flaky Azure apt mirror
+        run: echo "https://archive.ubuntu.com/ubuntu" | sudo tee /etc/apt/apt-mirrors.txt
+
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
 
       - name: Install E2E dependencies
         working-directory: e2e
-        run: npm install
+        run: npm ci
 
       - name: Get Playwright version
         working-directory: e2e
@@ -119,11 +124,19 @@ jobs:
       - name: Install Playwright browsers (cache miss)
         working-directory: e2e
         if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 5
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          NEEDRESTART_MODE: a
         run: npx playwright install --with-deps chromium
 
       - name: Install Playwright OS deps only (cache hit)
         working-directory: e2e
         if: steps.playwright-cache.outputs.cache-hit == 'true'
+        timeout-minutes: 5
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          NEEDRESTART_MODE: a
         run: npx playwright install-deps chromium
 
       - name: Reset database

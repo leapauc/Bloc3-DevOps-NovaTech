@@ -219,8 +219,4 @@ Le `scope` est optionnel (ex. `fix(cd): fix cd traefic`, `refacto(infra): try Bl
 4. Documenter les décisions d'infrastructure non triviales directement en commentaire dans le `.tf` concerné (convention déjà en place dans `terraform/`).
 5. Merger dans `main` seulement quand on est prêt pour une mise en production (cf. avertissement CI/CD ci-dessus).
 
-## Tests
-TODO
 
----
-*Dernière mise à jour : Août 2026*

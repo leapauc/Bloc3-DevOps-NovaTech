@@ -219,8 +219,3 @@ The `scope` is optional (e.g. `fix(cd): fix cd traefic`, `refacto(infra): try Bl
 4. Document non-trivial infrastructure decisions directly as comments in the relevant `.tf` file (existing convention in `terraform/`).
 5. Merge into `main` only when ready to ship to production (see the CI/CD warning above).
 
-## Tests
-TODO
-
----
-Last updated: August 2026

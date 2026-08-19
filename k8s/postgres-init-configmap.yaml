@@ -1,3 +1,14 @@
+# RDS est partagée entre les deux couleurs Blue-Green (voir terraform/main.tf,
+# modules ec2_blue/ec2_green) : pendant une bascule, l'ancienne ET la nouvelle
+# version du code lisent/écrivent le même schéma. Toute évolution ici doit
+# donc rester compatible avec la version N-1 du code le temps de la fenêtre
+# de coexistence :
+#   - ajouts : colonnes nullable ou avec DEFAULT (jamais NOT NULL sans défaut)
+#   - suppressions/renommages : jamais en direct, toujours en 2 releases
+#     (release N : ajouter la nouvelle colonne + double-écriture par le code ;
+#      release N+1, une fois la bascule confirmée stable : supprimer l'ancienne)
+# Ce fichier doit rester idempotent (IF NOT EXISTS / ON CONFLICT) : il est
+# ré-appliqué à chaque déploiement, sur la couleur idle comme sur l'active.
 apiVersion: v1
 kind: ConfigMap
 metadata:

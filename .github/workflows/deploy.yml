@@ -24,35 +24,32 @@ env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
 
 jobs:
+  # ============================================================
+  # Provisionne/maintient à jour l'infra Blue-Green (2 EC2 k3s + 1 ALB avec
+  # une target group par couleur + 1 RDS partagée). Cet apply ne bascule
+  # JAMAIS le trafic : il repasse toujours la couleur DEJA active (lue dans
+  # le state avant apply), donc c'est un apply "de synchro" pur (AMI,
+  # instance_type, etc.). La bascule elle-même n'a lieu que dans le job
+  # switch-traffic, une fois la couleur idle déployée et smoke-testée.
+  # ============================================================
   terraform:
-    name: Provision infrastructure
+    name: Provision infrastructure (blue + green)
     runs-on: ubuntu-24.04
     environment: ${{ inputs.environment }}
     outputs:
-      instance_id: ${{ steps.tf-output.outputs.instance_id }}
+      instance_id_blue: ${{ steps.tf-output.outputs.instance_id_blue }}
+      instance_id_green: ${{ steps.tf-output.outputs.instance_id_green }}
       rds_endpoint: ${{ steps.tf-output.outputs.rds_endpoint }}
       rds_address: ${{ steps.tf-output.outputs.rds_address }}
       db_name: ${{ steps.tf-output.outputs.db_name }}
       db_username: ${{ steps.tf-output.outputs.db_username }}
       alb_dns_name: ${{ steps.tf-output.outputs.alb_dns_name }}
+      active_color: ${{ steps.tf-output.outputs.active_color }}
+      idle_color: ${{ steps.tf-output.outputs.idle_color }}
     env:
-      # Un seul nom de var Terraform pour le mot de passe DB (avant : deux
-      # TF_VAR différents, database_password et db_password, alors qu'une
-      # seule variable "database_password" est déclarée dans variables.tf)
       TF_VAR_database_password: ${{ secrets.DB_PASSWORD }}
       TF_VAR_ssh_allowed_cidr: ${{ secrets.SSH_ALLOWED_CIDR }}
-      # JWT_SECRET / JWT_REFRESH_SECRET / STRIPE_SECRET_KEY / CORS_ALLOWED_ORIGINS ne sont
-      # pas des variables Terraform (aucune déclarée dans variables.tf) : elles ne sont
-      # consommées que plus bas, directement via secrets.*/vars.*, pour le ConfigMap/Secret k8s.
-      # database_name / database_username NE sont plus surchargés par des vars GitHub ici :
-      # Terraform (staging.tfvars / production.tfvars) est désormais la seule source de
-      # vérité. Le nom/utilisateur de la base sont republiés en outputs Terraform et lus
-      # depuis needs.terraform.outputs.db_name / db_username plus bas, pour qu'il soit
-      # structurellement impossible que Terraform et le ConfigMap/Secret k8s divergent
-      # (c'est cette divergence qui a forcé un remplacement de la RDS en préparation).
       TF_VAR_certificate_arn: ${{ vars.ACM_CERTIFICATE_ARN }}
-      # Pas une donnée sensible (pas d'identifiant/secret exploitable) : vars.*
-      # comme CORS_ALLOWED_ORIGINS/ACM_CERTIFICATE_ARN, pas secrets.*.
       TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
 
     steps:
@@ -80,13 +77,32 @@ jobs:
         working-directory: ./terraform
         run: terraform validate
 
+      # Doit tourner AVANT le plan/apply : sans ça, ne pas passer -var
+      # "active_color" referait retomber l'apply sur le default de la
+      # variable ("blue"), ce qui basculerait le trafic silencieusement à
+      # chaque simple sync d'infra. Le fallback "blue" ne sert qu'au tout
+      # premier apply (aucun state/output n'existe encore).
+      - name: Determine current active color
+        id: color
+        working-directory: ./terraform
+        run: |
+          ACTIVE_COLOR="$(terraform output -raw active_color 2>/dev/null || echo blue)"
+          echo "Couleur active actuelle : $ACTIVE_COLOR"
+          echo "ACTIVE_COLOR=${ACTIVE_COLOR}" >> "$GITHUB_ENV"
+
       - name: Terraform Plan
         working-directory: ./terraform
-        run: terraform plan -var-file="${{ inputs.environment }}.tfvars"
+        run: |
+          terraform plan \
+            -var-file="${{ inputs.environment }}.tfvars" \
+            -var="active_color=${ACTIVE_COLOR}"
 
       - name: Terraform Apply
         working-directory: ./terraform
-        run: terraform apply -auto-approve -var-file="${{ inputs.environment }}.tfvars"
+        run: |
+          terraform apply -auto-approve \
+            -var-file="${{ inputs.environment }}.tfvars" \
+            -var="active_color=${ACTIVE_COLOR}"
 
       - name: Get terraform outputs
         id: tf-output
@@ -94,10 +110,9 @@ jobs:
         run: |
           set -euo pipefail
           # Un output vide (ex: mauvais workspace, apply partiel) ne doit jamais
-          # continuer silencieusement : ça produirait un ConfigMap/Secret k8s avec
-          # des valeurs vides et un job postgres-init qui boucle jusqu'au timeout
-          # sans jamais dire pourquoi.
-          for name in instance_id rds_endpoint rds_address db_name db_username alb_dns_name; do
+          # continuer silencieusement.
+          for name in instance_id_blue instance_id_green rds_endpoint rds_address \
+                      db_name db_username alb_dns_name active_color; do
             value="$(terraform output -raw "$name")"
             if [ -z "$value" ]; then
               echo "::error::terraform output '$name' est vide (workspace: $(terraform workspace show))." >&2
@@ -106,15 +121,24 @@ jobs:
             echo "${name}=${value}" >> "$GITHUB_OUTPUT"
           done
 
-  deploy-k8s:
-    name: Deploy application to k3s
+          ACTIVE_COLOR="$(terraform output -raw active_color)"
+          if [ "$ACTIVE_COLOR" = "blue" ]; then IDLE_COLOR=green; else IDLE_COLOR=blue; fi
+          echo "idle_color=${IDLE_COLOR}" >> "$GITHUB_OUTPUT"
+
+  # ============================================================
+  # Déploie la nouvelle version sur le cluster k3s de la couleur IDLE
+  # (celle qui ne sert pas le trafic public). Reprend telle quelle la
+  # logique de déploiement k8s existante (SSM, Traefik, ConfigMap/Secret,
+  # postgres-init, services, ingress) — seule différence : la cible SSM est
+  # l'instance idle, pas "l'unique" instance d'avant.
+  # ============================================================
+  deploy-idle:
+    name: Deploy application to k3s (idle)
     runs-on: ubuntu-24.04
     needs: terraform
     environment: ${{ inputs.environment }}
     env:
       NAMESPACE: hrflow-${{ inputs.environment }}
-      # 2 réplicas par service en production (résilience/capacité sur le t4g.xlarge
-      # dédié), 1 seul en staging pour rester léger sur le t4g.large partagé.
       REPLICAS: ${{ inputs.environment == 'production' && '2' || '1' }}
     steps:
       - name: Checkout source
@@ -131,12 +155,9 @@ jobs:
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
 
       # needs.terraform.outputs.* peut arriver vide ici même quand le job terraform
-      # a réussi avec des valeurs non vides : c'est un bug de propagation des job
-      # outputs GitHub Actions (cf. actions/runner#2477), intermittent et sélectif
-      # (certains outputs passent, d'autres non, sur le même run). Plutôt que de
-      # dépendre de ce mécanisme pour des valeurs critiques, on relit directement
-      # le state Terraform (backend S3 distant, donc déjà persisté par le job
-      # terraform) : c'est la même source de vérité, sans le maillon fragile.
+      # a réussi avec des valeurs non vides (cf actions/runner#2477, intermittent).
+      # On relit directement le state Terraform (backend S3 distant, déjà persisté
+      # par le job terraform) plutôt que de dépendre de ce mécanisme.
       - name: Get terraform outputs from state
         working-directory: ./terraform
         run: |
@@ -144,23 +165,29 @@ jobs:
           terraform init -input=false
           terraform workspace select "${{ inputs.environment }}"
 
+          ACTIVE_COLOR="$(terraform output -raw active_color)"
+          if [ "$ACTIVE_COLOR" = "blue" ]; then IDLE_COLOR=green; else IDLE_COLOR=blue; fi
+          echo "ACTIVE_COLOR=${ACTIVE_COLOR}" >> "$GITHUB_ENV"
+          echo "IDLE_COLOR=${IDLE_COLOR}" >> "$GITHUB_ENV"
+
           declare -A tf_to_env=(
-            [instance_id]=INSTANCE_ID
             [rds_endpoint]=RDS_ENDPOINT
             [rds_address]=RDS_ADDRESS
             [db_name]=DB_NAME
             [db_username]=DB_USERNAME
             [alb_dns_name]=ALB_DNS_NAME
+            ["instance_id_${IDLE_COLOR}"]=INSTANCE_ID
           )
           for tf_name in "${!tf_to_env[@]}"; do
             env_name="${tf_to_env[$tf_name]}"
             value="$(terraform output -raw "$tf_name")"
             if [ -z "$value" ]; then
-              echo "::error::terraform output '$tf_name' est vide (workspace: $(terraform workspace show)) en le relisant depuis deploy-k8s." >&2
+              echo "::error::terraform output '$tf_name' est vide (workspace: $(terraform workspace show))." >&2
               exit 1
             fi
             echo "${env_name}=${value}" >> "$GITHUB_ENV"
           done
+          echo "Déploiement de la couleur idle ($IDLE_COLOR, active actuelle : $ACTIVE_COLOR) sur l'instance $INSTANCE_ID"
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@3e0aec4d80787158d308d7b364cb1b702e7feb7f # v4
@@ -234,8 +261,6 @@ jobs:
             --parameters 'commands=["cat /etc/rancher/k3s/k3s.yaml"]' \
             --query "Command.CommandId" --output text)
 
-          # On ignore le code de sortie du wait ici : s'il échoue, on veut quand
-          # même récupérer stdout/stderr ci-dessous avant d'arrêter le job.
           aws ssm wait command-executed \
             --command-id "$COMMAND_ID" \
             --instance-id "$INSTANCE_ID" || true
@@ -292,34 +317,6 @@ jobs:
 
       - name: Install/upgrade Traefik
         run: |
-          # Toujours rejoué (idempotent via helm upgrade --install), et non plus
-          # seulement "si absent" : un ancien run avait laissé Traefik installé
-          # mais mal configuré (voir commentaires ci-dessous), et comme ce step
-          # ne faisait rien tant que le Deployment existait déjà, ce mauvais
-          # config restait en place indéfiniment malgré des pipelines "verts"
-          # (le pod traefik restait Pending, donc l'ALB avait 0 target healthy
-          # -> 502 permanent, sans que la pipeline ne le voie jamais).
-          #
-          # Trois réglages non-évidents nécessaires avec hostNetwork=true sur ce
-          # cluster k3s mono-noeud (chart traefik/traefik) :
-          #  - service.spec.type=ClusterIP : par défaut le chart crée un Service
-          #    de type LoadBalancer, ce qui sur k3s déclenche son ServiceLB
-          #    intégré (pod svclb-traefik) qui vient lui aussi bind les ports
-          #    hôte 80/443 -> conflit direct avec le pod traefik (hostNetwork)
-          #    qui veut les mêmes ports -> pod bloqué en Pending indéfiniment
-          #    ("didn't have free ports"). Inutile ici : le vrai load balancer
-          #    est l'ALB AWS, qui atteint déjà le node directement sur :80.
-          #  - ports.metrics.port=9101 : le port metrics par défaut du chart
-          #    (9100) rentre en conflit avec le node-exporter Prometheus déjà
-          #    présent sur le node (monitoring stack), pour la même raison
-          #    (hostNetwork expose tous les containerPort comme hostPort).
-          #  - podSecurityContext.runAsUser=0 + capabilities.drop=null : le
-          #    hardening par défaut du chart (uid non-root + drop ALL + ajout
-          #    explicite de CAP_NET_BIND_SERVICE) devrait suffire à bind le
-          #    port privilégié 80, mais échoue en pratique sur cette AMI/ce
-          #    kernel ARM64 ("bind: permission denied" même avec la capability
-          #    ajoutée). Compromis pragmatique : tourner en root sans drop de
-          #    capabilities plutôt que bloquer indéfiniment sur ce mystère.
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
@@ -334,9 +331,6 @@ jobs:
             --query "Command.CommandId" --output text)
 
           echo "Waiting for Traefik install command to complete..."
-          # On ignore le code de sortie du wait ici : s'il échoue, on veut quand
-          # même récupérer stdout/stderr et le Status ci-dessous avant d'arrêter
-          # le job (cf. même pattern que "Fetch kubeconfig via SSM" plus haut).
           aws ssm wait command-executed \
             --command-id "$COMMAND_ID" \
             --instance-id "$INSTANCE_ID" || true
@@ -351,9 +345,6 @@ jobs:
             --command-id "$COMMAND_ID" \
             --query "StandardOutputContent" --output text
 
-          # Sans ce check, un échec silencieux ici (helm/kubectl en erreur) laissait
-          # le pipeline "vert" alors que Traefik restait absent/mal configuré ->
-          # 0 target ALB healthy -> 502 permanent, découvert seulement en prod.
           if [ "$STATUS" != "Success" ]; then
             echo "ERREUR : l'installation de Traefik a échoué (status: $STATUS)."
             echo "--- stderr de la commande SSM ---"
@@ -366,15 +357,6 @@ jobs:
 
       - name: Verify Traefik is actually serving traffic
         run: |
-          # Le rollout peut réussir (pod Running) sans que Traefik écoute
-          # correctement sur le hostPort 80 (ex: mauvaise config des ports du
-          # chart) : c'est exactement ce qui s'est produit en prod (pipeline
-          # vert, Traefik absent, ALB en 502 permanent). On vérifie donc
-          # directement, depuis le node lui-même via SSM, que quelque chose
-          # répond en HTTP sur :80 - le port 80 du node n'est routable que
-          # depuis le security group de l'ALB (cf alb_to_ec2_http dans
-          # terraform/main.tf), donc un curl direct depuis le runner GitHub
-          # Actions échouerait de toute façon, Traefik marchant ou non.
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
@@ -459,8 +441,6 @@ jobs:
       - name: Initialize database schema
         run: |
           kubectl apply -f k8s/postgres-init-configmap.yaml -n ${{ env.NAMESPACE }}
-          # Un Job est immuable : on supprime l'ancien avant de relancer (le script est
-          # idempotent — IF NOT EXISTS / ON CONFLICT DO NOTHING — donc sans risque à rejouer)
           kubectl delete job postgres-init -n ${{ env.NAMESPACE }} --ignore-not-found
           kubectl apply -f k8s/postgres-init-job.yaml -n ${{ env.NAMESPACE }}
           kubectl wait --for=condition=complete job/postgres-init -n ${{ env.NAMESPACE }} --timeout=120s
@@ -472,7 +452,6 @@ jobs:
 
       - name: Deploy Redis
         run: |
-          # Postgres n'est plus déployé ici : on utilise désormais RDS (voir ConfigMap DB_HOST)
           kubectl apply -f k8s/redis/ -n ${{ env.NAMESPACE }}
           kubectl rollout status statefulset/redis -n ${{ env.NAMESPACE }} --timeout=60s
 
@@ -527,10 +506,167 @@ jobs:
       - name: Apply Ingress
         run: kubectl apply -f k8s/ingress.yaml -n ${{ env.NAMESPACE }}
 
-      - name: Show access endpoints
+      - name: Show idle cluster status
         run: |
-          echo "Application disponible via l'ALB : http://${{ env.ALB_DNS_NAME }}"
+          echo "Couleur idle ($IDLE_COLOR) déployée sur l'instance $INSTANCE_ID."
+          echo "Pas encore de trafic public dessus : bascule faite par le job switch-traffic après smoke-test-idle."
 
       - name: Close SSM tunnel
         if: always()
         run: kill "$SSM_TUNNEL_PID" || true
+
+  # ============================================================
+  # Smoke tests sur la couleur idle, AVANT toute bascule de trafic. On
+  # atteint le port 80 de l'instance idle via un tunnel SSM (le security
+  # group n'autorise ce port QUE depuis l'ALB, donc le tunnel SSM est le
+  # seul moyen d'y accéder directement, même pattern que le tunnel 6443
+  # utilisé pour l'API k3s dans le job deploy-idle).
+  # ============================================================
+  smoke-test-idle:
+    name: Smoke test idle color
+    runs-on: ubuntu-24.04
+    needs: [terraform, deploy-idle]
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+
+      - name: Get idle instance from state
+        working-directory: ./terraform
+        run: |
+          set -euo pipefail
+          terraform init -input=false
+          terraform workspace select "${{ inputs.environment }}"
+
+          ACTIVE_COLOR="$(terraform output -raw active_color)"
+          if [ "$ACTIVE_COLOR" = "blue" ]; then IDLE_COLOR=green; else IDLE_COLOR=blue; fi
+          INSTANCE_ID="$(terraform output -raw "instance_id_${IDLE_COLOR}")"
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "::error::instance_id_${IDLE_COLOR} est vide." >&2
+            exit 1
+          fi
+          echo "IDLE_COLOR=${IDLE_COLOR}" >> "$GITHUB_ENV"
+          echo "INSTANCE_ID=${INSTANCE_ID}" >> "$GITHUB_ENV"
+
+      - name: Install Session Manager plugin
+        run: |
+          curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
+          sudo dpkg -i session-manager-plugin.deb
+
+      - name: Start SSM port-forward tunnel to idle instance (port 80)
+        run: |
+          aws ssm start-session \
+            --target "$INSTANCE_ID" \
+            --document-name AWS-StartPortForwardingSession \
+            --parameters '{"portNumber":["80"],"localPortNumber":["18080"]}' \
+            > ssm-tunnel.log 2>&1 &
+          echo "SSM_TUNNEL_PID=$!" >> "$GITHUB_ENV"
+
+          for i in $(seq 1 10); do
+            if nc -z 127.0.0.1 18080 2>/dev/null; then
+              echo "Tunnel SSM établi sur le port 18080 -> instance:80."
+              break
+            fi
+            echo "Attente du tunnel SSM... ($i/10)"
+            sleep 3
+          done
+
+      - name: Smoke test frontend and gateway (via idle instance)
+        run: |
+          timeout 120 bash -c '
+            until curl -fsS http://localhost:18080/ > /dev/null; do
+              echo "Waiting for frontend on idle color..."
+              sleep 3
+            done
+          '
+          # /api-docs/json agrège le spec OpenAPI du gateway ET des 4 services
+          # back (auth/paie/conges/recrutement) : un 200 ici confirme que le
+          # gateway répond ET que les 4 services back lui répondent.
+          timeout 120 bash -c '
+            until curl -fsS http://localhost:18080/api-docs/json > /dev/null; do
+              echo "Waiting for API Gateway on idle color..."
+              sleep 3
+            done
+          '
+          echo "Smoke tests OK sur la couleur idle ($IDLE_COLOR)."
+
+      - name: Close SSM tunnel
+        if: always()
+        run: kill "$SSM_TUNNEL_PID" || true
+
+  # ============================================================
+  # Bascule atomique du trafic : bouge uniquement le default_action du
+  # listener ALB vers la target group idle (in-place, pas de recréation
+  # d'instance, pas de downtime). L'ancienne couleur active reste allumée
+  # telle quelle : c'est le filet de rollback instantané (workflow
+  # rollback.yml, qui refait le même apply avec l'autre couleur).
+  # ============================================================
+  switch-traffic:
+    name: Switch traffic to idle color
+    runs-on: ubuntu-24.04
+    needs: [terraform, smoke-test-idle]
+    environment: ${{ inputs.environment }}
+    env:
+      TF_VAR_database_password: ${{ secrets.DB_PASSWORD }}
+      TF_VAR_ssh_allowed_cidr: ${{ secrets.SSH_ALLOWED_CIDR }}
+      TF_VAR_certificate_arn: ${{ vars.ACM_CERTIFICATE_ARN }}
+      TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+
+      - name: Terraform init & select workspace
+        working-directory: ./terraform
+        run: |
+          terraform init -input=false
+          terraform workspace select "${{ inputs.environment }}"
+
+      - name: Determine idle color
+        working-directory: ./terraform
+        run: |
+          set -euo pipefail
+          ACTIVE_COLOR="$(terraform output -raw active_color)"
+          if [ "$ACTIVE_COLOR" = "blue" ]; then IDLE_COLOR=green; else IDLE_COLOR=blue; fi
+          echo "Bascule : $ACTIVE_COLOR -> $IDLE_COLOR"
+          echo "IDLE_COLOR=${IDLE_COLOR}" >> "$GITHUB_ENV"
+
+      - name: Switch ALB listener to idle color
+        working-directory: ./terraform
+        run: |
+          terraform apply -auto-approve \
+            -var-file="${{ inputs.environment }}.tfvars" \
+            -var="active_color=${IDLE_COLOR}"
+
+      - name: Verify switch via public ALB
+        working-directory: ./terraform
+        run: |
+          set -euo pipefail
+          ALB_DNS_NAME="$(terraform output -raw alb_dns_name)"
+          timeout 60 bash -c "
+            until curl -fsS http://${ALB_DNS_NAME}/ > /dev/null; do
+              echo 'Waiting for ALB to serve the new active color...'
+              sleep 3
+            done
+          "
+          echo "Bascule confirmée : l'ALB (${ALB_DNS_NAME}) sert désormais la couleur ${IDLE_COLOR}."

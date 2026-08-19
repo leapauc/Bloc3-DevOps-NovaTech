@@ -11,9 +11,9 @@ variable "subnet_ids" {
   type = list(string)
 }
 
-variable "ec2_security_group_id" {
-  description = "Security group de l'EC2 k3s : seul autorisé à parler à la base"
-  type        = string
+variable "ec2_security_group_ids" {
+  description = "Security groups des EC2 k3s (blue + green) : seuls autorisés à parler à la base"
+  type        = list(string)
 }
 
 variable "database_name" {

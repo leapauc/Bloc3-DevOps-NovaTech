@@ -29,12 +29,16 @@ module "network" {
 }
 
 # ============================================================
-# EC2 UBUNTU 24.04 ARM64 + K3S
+# EC2 UBUNTU 24.04 ARM64 + K3S — BLUE / GREEN
+# Deux clusters k3s complets et indépendants, un par couleur, chacun dans
+# une AZ différente (isolation réelle). Le module ec2 n'est pas modifié :
+# on le distingue par project_name (les noms de rôle IAM / security group
+# doivent être uniques par compte/VPC) et par subnet.
 # ============================================================
-module "ec2" {
+module "ec2_blue" {
   source = "./modules/ec2"
 
-  project_name     = var.project_name
+  project_name     = "${var.project_name}-blue"
   vpc_id           = module.network.vpc_id
   public_subnet_id = module.network.public_subnet_ids[0]
   ssh_allowed_cidr = var.ssh_allowed_cidr
@@ -42,19 +46,39 @@ module "ec2" {
   key_name         = var.key_name
 }
 
+module "ec2_green" {
+  source = "./modules/ec2"
+
+  project_name     = "${var.project_name}-green"
+  vpc_id           = module.network.vpc_id
+  public_subnet_id = module.network.public_subnet_ids[1]
+  ssh_allowed_cidr = var.ssh_allowed_cidr
+  instance_type    = var.instance_type
+  key_name         = var.key_name
+}
+
 # ============================================================
-# MONITORING (alerte email si l'EC2 k3s ne répond plus)
+# MONITORING (alerte email si une EC2 k3s ne répond plus) — une alarme par couleur
 # ============================================================
-module "monitoring" {
+module "monitoring_blue" {
   source = "./modules/monitoring"
 
-  project_name = var.project_name
-  instance_id  = module.ec2.instance_id
+  project_name = "${var.project_name}-blue"
+  instance_id  = module.ec2_blue.instance_id
+  alert_email  = var.alert_email
+}
+
+module "monitoring_green" {
+  source = "./modules/monitoring"
+
+  project_name = "${var.project_name}-green"
+  instance_id  = module.ec2_green.instance_id
   alert_email  = var.alert_email
 }
 
 # ============================================================
-# RDS POSTGRESQL
+# RDS POSTGRESQL (partagée entre blue et green — cf. discipline de
+# migration additive-only documentée dans k8s/postgres-init-configmap.yaml)
 # ============================================================
 module "rds" {
   source = "./modules/rds"
@@ -62,9 +86,9 @@ module "rds" {
   project_name = var.project_name
 
   vpc_id     = module.network.vpc_id
-  subnet_ids = module.network.public_subnet_ids # même subnets que l'EC2, publicly_accessible=false donc pas exposée
+  subnet_ids = module.network.public_subnet_ids # mêmes subnets que les EC2, publicly_accessible=false donc pas exposée
 
-  ec2_security_group_id = module.ec2.security_group_id
+  ec2_security_group_ids = [module.ec2_blue.security_group_id, module.ec2_green.security_group_id]
 
   database_name     = var.database_name
   database_username = var.database_username
@@ -73,7 +97,8 @@ module "rds" {
 }
 
 # ============================================================
-# APPLICATION LOAD BALANCER
+# APPLICATION LOAD BALANCER (une target group par couleur, bascule via
+# active_color sur le listener)
 # ============================================================
 module "alb" {
   source = "./modules/alb"
@@ -82,18 +107,34 @@ module "alb" {
   vpc_id       = module.network.vpc_id
   subnet_ids   = module.network.public_subnet_ids # >= 2 AZ requis par l'ALB
 
-  instance_id     = module.ec2.instance_id
+  instance_ids = {
+    blue  = module.ec2_blue.instance_id
+    green = module.ec2_green.instance_id
+  }
+  active_color    = var.active_color
   target_port     = 80
   certificate_arn = var.certificate_arn
 }
 
-# L'EC2 n'accepte le port 80 QUE depuis l'ALB (plus de 0.0.0.0/0 direct sur l'instance)
-resource "aws_security_group_rule" "alb_to_ec2_http" {
+# Chaque EC2 n'accepte le port 80 QUE depuis l'ALB (plus de 0.0.0.0/0 direct
+# sur l'instance). Toujours autorisée même si idle : c'est le listener ALB
+# (module.alb, active_color) qui décide qui reçoit vraiment le trafic.
+resource "aws_security_group_rule" "alb_to_ec2_http_blue" {
   type                     = "ingress"
   from_port                = 80
   to_port                  = 80
   protocol                 = "tcp"
-  security_group_id        = module.ec2.security_group_id
+  security_group_id        = module.ec2_blue.security_group_id
+  source_security_group_id = module.alb.security_group_id
+  description              = "HTTP depuis le load balancer uniquement"
+}
+
+resource "aws_security_group_rule" "alb_to_ec2_http_green" {
+  type                     = "ingress"
+  from_port                = 80
+  to_port                  = 80
+  protocol                 = "tcp"
+  security_group_id        = module.ec2_green.security_group_id
   source_security_group_id = module.alb.security_group_id
   description              = "HTTP depuis le load balancer uniquement"
 }
@@ -116,4 +157,17 @@ output "db_username" {
 
 output "alb_dns_name" {
   value = module.alb.dns_name
+}
+
+output "active_color" {
+  description = "Couleur actuellement servie par l'ALB — lu par le workflow CD pour déterminer la couleur idle avant déploiement"
+  value       = var.active_color
+}
+
+output "instance_id_blue" {
+  value = module.ec2_blue.instance_id
+}
+
+output "instance_id_green" {
+  value = module.ec2_green.instance_id
 }

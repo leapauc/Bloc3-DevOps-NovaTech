@@ -14,11 +14,11 @@ resource "aws_security_group" "rds" {
   vpc_id      = var.vpc_id
 
   ingress {
-    description     = "Postgres depuis EC2 k3s"
+    description     = "Postgres depuis les EC2 k3s (blue + green)"
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [var.ec2_security_group_id]
+    security_groups = var.ec2_security_group_ids
   }
 
   egress {

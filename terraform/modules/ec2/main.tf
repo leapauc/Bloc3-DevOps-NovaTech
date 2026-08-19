@@ -3,6 +3,12 @@
 # Ubuntu 24.04 ARM64
 # ============================================================
 
+locals {
+  # Préfixe des tags Name uniquement — ne touche jamais aux `name =` réels
+  # (ForceNew) des ressources IAM/SG ci-dessous.
+  name = var.name_tag != "" ? var.name_tag : var.project_name
+}
+
 # ============================================================
 # DATA - UBUNTU 24.04 ARM64
 # ============================================================
@@ -50,7 +56,7 @@ resource "aws_iam_role" "k3s_ssm" {
   })
 
   tags = {
-    Name = "${var.project_name}-k3s-ssm-role"
+    Name = "${local.name}-k3s-ssm-role"
   }
 }
 
@@ -64,7 +70,7 @@ resource "aws_iam_instance_profile" "k3s" {
   role = aws_iam_role.k3s_ssm.name
 
   tags = {
-    Name = "${var.project_name}-k3s-instance-profile"
+    Name = "${local.name}-k3s-instance-profile"
   }
 }
 
@@ -86,7 +92,7 @@ resource "aws_security_group" "k3s" {
   }
 
   tags = {
-    Name = "${var.project_name}-k3s-sg"
+    Name = "${local.name}-k3s-sg"
   }
 }
 
@@ -200,7 +206,7 @@ resource "aws_instance" "k3s" {
     volume_size = 30
     encrypted   = true
     tags = {
-      Name = "${var.project_name}-k3s-root"
+      Name = "${local.name}-k3s-root"
     }
   }
 
@@ -608,6 +614,6 @@ date
 EOF
 
   tags = {
-    Name = "${var.project_name}-k3s"
+    Name = "${local.name}-k3s"
   }
 }

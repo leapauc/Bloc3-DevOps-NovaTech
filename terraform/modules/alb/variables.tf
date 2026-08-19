@@ -11,9 +11,24 @@ variable "subnet_ids" {
   type = list(string)
 }
 
-variable "instance_id" {
-  description = "Instance EC2 k3s ciblée par l'ALB (Traefik écoute en hostNetwork sur le port 80)"
+variable "instance_ids" {
+  description = "Instances EC2 k3s blue/green (Traefik écoute en hostNetwork sur le port 80 sur chacune) : une target group par couleur"
+  type        = map(string)
+
+  validation {
+    condition     = length(setsubtract(keys(var.instance_ids), ["blue", "green"])) == 0
+    error_message = "instance_ids doit avoir pour clés uniquement \"blue\" et/ou \"green\"."
+  }
+}
+
+variable "active_color" {
+  description = "Couleur actuellement servie par le listener ALB (bascule = changer cette valeur puis apply)"
   type        = string
+
+  validation {
+    condition     = contains(["blue", "green"], var.active_color)
+    error_message = "active_color doit être \"blue\" ou \"green\"."
+  }
 }
 
 variable "target_port" {

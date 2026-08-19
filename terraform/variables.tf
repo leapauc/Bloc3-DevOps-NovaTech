@@ -78,6 +78,22 @@ variable "environment" {
   default = "staging"
 }
 
+# Knob d'exécution pour la bascule Blue-Green : ne JAMAIS committer une
+# valeur différente de "blue" dans staging.tfvars/production.tfvars. La
+# vraie valeur active est toujours passée par le workflow CD via
+# `-var="active_color=..."`, lue depuis `terraform output active_color` du
+# state existant (le default ci-dessous ne sert qu'au tout premier apply).
+variable "active_color" {
+  description = "Couleur actuellement servie par l'ALB : \"blue\" ou \"green\""
+  type        = string
+  default     = "blue"
+
+  validation {
+    condition     = contains(["blue", "green"], var.active_color)
+    error_message = "active_color doit être \"blue\" ou \"green\"."
+  }
+}
+
 # ============================================================
 # MONITORING
 # ============================================================

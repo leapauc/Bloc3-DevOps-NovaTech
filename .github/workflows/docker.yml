@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 concurrency:
   group: hrflow-docker-${{ github.workflow }}-${{ github.ref }}
@@ -80,18 +81,70 @@ jobs:
           (startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main')
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
+      - name: Build Docker image
+        if: >
+          github.event_name == 'push' &&
+          (startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main')
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            -f "${{ matrix.dockerfile }}" \
+            -t "hrflow/${{ matrix.name }}:scan" \
+            --load \
+            .
+
+      # Tableau lisible dans les logs du job : avec format=sarif (step suivant),
+      # Trivy n'imprime aucun détail sur stdout (tout part dans le fichier), donc
+      # sans ce passage-ci un exit-code 1 n'indique jamais QUELLES CVE ont matché.
+      - name: Show Trivy scan results
+        if: >
+          github.event_name == 'push' &&
+          (startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main')
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          image-ref: hrflow/${{ matrix.name }}:scan
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      # Scan de l'image locale AVANT le push vers ECR : on ne veut pas publier
+      # une image avec des CVE HIGH/CRITICAL corrigibles. ECR a bien
+      # scanOnPush=true (voir job ci-dessus), mais ça scanne APRES publication ;
+      # Trivy ici sert de gate en amont. Rapport seul pour l'instant
+      # (exit-code 0) : tant que la première liste de CVE (alpine 3.24 +
+      # paquets node) n'a pas été triée, bloquer casserait tous les push sur
+      # toutes les branches. Repasser exit-code à '1' une fois triée.
+      - name: Scan image with Trivy
+        if: >
+          github.event_name == 'push' &&
+          (startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main')
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          image-ref: hrflow/${{ matrix.name }}:scan
+          format: sarif
+          output: trivy-${{ matrix.name }}.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        if: >
+          !cancelled() &&
+          github.event_name == 'push' &&
+          (startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main')
+        uses: github/codeql-action/upload-sarif@67ba681cdcbc95ed0371c210ccf82c4d968ae5eb # v3.37.7
+        with:
+          sarif_file: trivy-${{ matrix.name }}.sarif
+          category: trivy-${{ matrix.name }}
+
+      - name: Push Docker image
         if: >
           github.event_name == 'push' &&
           (startsWith(github.ref, 'refs/heads/dev-') || github.ref == 'refs/heads/main')
         run: |
           IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${GITHUB_SHA}"
 
-          echo "Build et push de $IMAGE"
+          echo "Push de $IMAGE"
 
-          docker buildx build \
-            --platform linux/arm64 \
-            -f "${{ matrix.dockerfile }}" \
-            -t "$IMAGE" \
-            --push \
-            .
+          docker tag "hrflow/${{ matrix.name }}:scan" "$IMAGE"
+          docker push "$IMAGE"

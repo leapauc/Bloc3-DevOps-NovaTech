@@ -124,6 +124,12 @@ async function mergeSpecs() {
 module.exports = async (app) => {
   try {
     const mergedSpecs = await mergeSpecs();
+    // Doit être déclarée avant le app.use('/api-docs', ...) ci-dessous : le
+    // middleware swaggerUi.setup() intercepte toute requête sous /api-docs
+    // (y compris /api-docs/json) et sert la page HTML, Express matchant les
+    // routes dans l'ordre d'enregistrement (même piège que dans les swagger.js
+    // des autres services).
+    app.get('/api-docs/json', (req, res) => res.json(mergedSpecs));
     app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(mergedSpecs, {
       customCss: '.swagger-ui .topbar { display: none }',
       customSiteTitle: 'API Gateway - HRFlow',

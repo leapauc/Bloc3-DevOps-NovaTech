@@ -3,6 +3,12 @@ variable "project_name" {
   type        = string
 }
 
+variable "name_tag" {
+  description = "Préfixe utilisé UNIQUEMENT pour les tags Name (cosmétique, update in-place). Laisser vide pour retomber sur project_name. Ne pilote jamais les arguments `name` réels (IAM role / instance profile / security group), qui restent sur project_name car ForceNew : les changer recréerait ces ressources."
+  type        = string
+  default     = ""
+}
+
 variable "vpc_id" {
   description = "ID du VPC"
   type        = string

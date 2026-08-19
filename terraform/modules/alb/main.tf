@@ -69,8 +69,12 @@ resource "aws_lb_target_group" "this" {
     unhealthy_threshold = 3
   }
 
+  # Tag Name toujours suffixé (contrairement au `name` ci-dessus) : purement
+  # cosmétique, ne touche pas l'attribut ForceNew, donc pas de recreate.
+  # Permet de repérer "blue" dans la console/les tags même si l'ARN réel
+  # reste "${var.project_name}-tg" sans suffixe.
   tags = {
-    Name = each.key == "blue" ? "${var.project_name}-tg" : "${var.project_name}-tg-${each.key}"
+    Name = "${var.project_name}-tg-${each.key}"
   }
 }
 

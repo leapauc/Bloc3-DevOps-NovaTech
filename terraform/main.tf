@@ -46,6 +46,7 @@ module "ec2_blue" {
   source = "./modules/ec2"
 
   project_name     = var.project_name
+  name_tag         = "${var.project_name}-blue" # cosmétique only (cf. modules/ec2/variables.tf) : distingue "my-project-blue-k3s" de green sans toucher aux noms ForceNew
   vpc_id           = module.network.vpc_id
   public_subnet_id = module.network.public_subnet_ids[0]
   ssh_allowed_cidr = var.ssh_allowed_cidr

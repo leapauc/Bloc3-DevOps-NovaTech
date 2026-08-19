@@ -214,6 +214,10 @@ jobs:
               exit 1
             fi
             echo "${env_name}=${value}" >> "$GITHUB_ENV"
+            # $GITHUB_ENV n'est lu qu'à partir du step SUIVANT : sans ça, la
+            # ligne echo de debug ci-dessous référencerait une variable shell
+            # jamais définie dans CE step (set -u -> "unbound variable").
+            printf -v "$env_name" '%s' "$value"
           done
           echo "Déploiement de la couleur idle ($IDLE_COLOR, active actuelle : $ACTIVE_COLOR) sur l'instance $INSTANCE_ID"
 

@@ -34,11 +34,18 @@ module "network" {
 # une AZ différente (isolation réelle). Le module ec2 n'est pas modifié :
 # on le distingue par project_name (les noms de rôle IAM / security group
 # doivent être uniques par compte/VPC) et par subnet.
+#
+# "blue" garde project_name INCHANGÉ (pas de suffixe) : c'est l'EC2 qui
+# existait déjà avant le Blue-Green (migrée via `terraform state mv module.ec2
+# module.ec2_blue`). Les noms de rôle IAM / security group / instance sont
+# ForceNew : un suffixe ici recréerait tout (et l'instance en cours de
+# service) au lieu d'un simple renommage d'adresse de state. Seul "green"
+# (vraiment nouveau) a besoin d'un nom distinct pour éviter la collision.
 # ============================================================
 module "ec2_blue" {
   source = "./modules/ec2"
 
-  project_name     = "${var.project_name}-blue"
+  project_name     = var.project_name
   vpc_id           = module.network.vpc_id
   public_subnet_id = module.network.public_subnet_ids[0]
   ssh_allowed_cidr = var.ssh_allowed_cidr
@@ -63,7 +70,14 @@ module "ec2_green" {
 module "monitoring_blue" {
   source = "./modules/monitoring"
 
-  project_name = "${var.project_name}-blue"
+  # Pas de suffixe "-blue" ici (contrairement à ec2_blue) : le nom du topic
+  # SNS et de l'alarme CloudWatch sont des attributs immuables (forcent un
+  # replace, donc la destruction de l'abonnement email déjà confirmé) et
+  # n'ont pas besoin d'être uniques entre blue/green comme le sont le rôle
+  # IAM/security group de l'EC2. En gardant project_name inchangé, ce module
+  # garde l'identité EXACTE de l'alerte déjà en place (my-project-alerts,
+  # my-project-ec2-down) — pur renommage d'adresse de state, zéro diff AWS.
+  project_name = var.project_name
   instance_id  = module.ec2_blue.instance_id
   alert_email  = var.alert_email
 }

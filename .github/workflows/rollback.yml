@@ -47,6 +47,11 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          # cf. deploy.yml : le wrapper par défaut pollue stdout avec une
+          # annotation d'erreur quand terraform échoue, ce qui casse la
+          # capture `$(terraform output ...)` utilisée ici.
+          terraform_wrapper: false
 
       - name: Terraform init & select workspace
         working-directory: ./terraform

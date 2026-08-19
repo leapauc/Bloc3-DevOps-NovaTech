@@ -49,7 +49,12 @@ resource "aws_lb" "this" {
 resource "aws_lb_target_group" "this" {
   for_each = var.instance_ids
 
-  name        = "${var.project_name}-tg-${each.key}"
+  # "blue" garde le nom EXISTANT ("${project_name}-tg", sans suffixe) : c'est
+  # la target group qui existait déjà avant le Blue-Green (migrée en state).
+  # name est ForceNew (immuable) sur une target group : lui donner un
+  # suffixe la recréerait pour rien. Seul "green" (nouveau) a besoin d'un nom
+  # distinct.
+  name        = each.key == "blue" ? "${var.project_name}-tg" : "${var.project_name}-tg-${each.key}"
   port        = var.target_port
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
@@ -65,7 +70,7 @@ resource "aws_lb_target_group" "this" {
   }
 
   tags = {
-    Name = "${var.project_name}-tg-${each.key}"
+    Name = each.key == "blue" ? "${var.project_name}-tg" : "${var.project_name}-tg-${each.key}"
   }
 }
 

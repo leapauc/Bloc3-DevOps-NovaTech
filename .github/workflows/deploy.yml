@@ -65,6 +65,15 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          # Le wrapper par défaut ajoute une annotation "::error::Terraform
+          # exited with code N." sur STDOUT (pas stderr) dès qu'une commande
+          # terraform échoue — ça pollue silencieusement tout `$(terraform
+          # output ...)` capturé en shell, même avec `2>/dev/null` (qui ne
+          # redirige que stderr). Désactivé partout ici car plusieurs steps
+          # dépendent d'une capture stdout propre (ex: fallback "blue" si
+          # active_color n'existe pas encore dans le state).
+          terraform_wrapper: false
 
       - name: Terraform init & select workspace
         working-directory: ./terraform
@@ -86,8 +95,18 @@ jobs:
         id: color
         working-directory: ./terraform
         run: |
-          ACTIVE_COLOR="$(terraform output -raw active_color 2>/dev/null || echo blue)"
-          echo "Couleur active actuelle : $ACTIVE_COLOR"
+          # Pas de `|| echo blue` sur la même ligne que la capture : si la
+          # commande échoue (1er apply, "active_color" n'existe pas encore
+          # dans le state), on écrase explicitement plutôt que de risquer de
+          # concaténer une sortie parasite dans ACTIVE_COLOR (ce qui casserait
+          # ensuite l'écriture dans $GITHUB_ENV, cf. incident précédent).
+          if ACTIVE_COLOR="$(terraform output -raw active_color 2>/dev/null)" \
+             && { [ "$ACTIVE_COLOR" = "blue" ] || [ "$ACTIVE_COLOR" = "green" ]; }; then
+            echo "Couleur active actuelle (lue dans le state) : $ACTIVE_COLOR"
+          else
+            ACTIVE_COLOR=blue
+            echo "Pas de couleur active dans le state (1er apply Blue-Green) : défaut = $ACTIVE_COLOR"
+          fi
           echo "ACTIVE_COLOR=${ACTIVE_COLOR}" >> "$GITHUB_ENV"
 
       - name: Terraform Plan
@@ -153,6 +172,15 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          # Le wrapper par défaut ajoute une annotation "::error::Terraform
+          # exited with code N." sur STDOUT (pas stderr) dès qu'une commande
+          # terraform échoue — ça pollue silencieusement tout `$(terraform
+          # output ...)` capturé en shell, même avec `2>/dev/null` (qui ne
+          # redirige que stderr). Désactivé partout ici car plusieurs steps
+          # dépendent d'une capture stdout propre (ex: fallback "blue" si
+          # active_color n'existe pas encore dans le state).
+          terraform_wrapper: false
 
       # needs.terraform.outputs.* peut arriver vide ici même quand le job terraform
       # a réussi avec des valeurs non vides (cf actions/runner#2477, intermittent).
@@ -540,6 +568,15 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          # Le wrapper par défaut ajoute une annotation "::error::Terraform
+          # exited with code N." sur STDOUT (pas stderr) dès qu'une commande
+          # terraform échoue — ça pollue silencieusement tout `$(terraform
+          # output ...)` capturé en shell, même avec `2>/dev/null` (qui ne
+          # redirige que stderr). Désactivé partout ici car plusieurs steps
+          # dépendent d'une capture stdout propre (ex: fallback "blue" si
+          # active_color n'existe pas encore dans le state).
+          terraform_wrapper: false
 
       - name: Get idle instance from state
         working-directory: ./terraform
@@ -635,6 +672,15 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          # Le wrapper par défaut ajoute une annotation "::error::Terraform
+          # exited with code N." sur STDOUT (pas stderr) dès qu'une commande
+          # terraform échoue — ça pollue silencieusement tout `$(terraform
+          # output ...)` capturé en shell, même avec `2>/dev/null` (qui ne
+          # redirige que stderr). Désactivé partout ici car plusieurs steps
+          # dépendent d'une capture stdout propre (ex: fallback "blue" si
+          # active_color n'existe pas encore dans le state).
+          terraform_wrapper: false
 
       - name: Terraform init & select workspace
         working-directory: ./terraform

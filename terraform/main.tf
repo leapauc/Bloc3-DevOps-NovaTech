@@ -154,6 +154,177 @@ resource "aws_security_group_rule" "alb_to_ec2_http_green" {
   description              = "HTTP depuis le load balancer uniquement"
 }
 
+# ============================================================
+# MONITORING — ALB & RDS (ressources partagées entre blue/green, donc pas
+# dupliquées par couleur comme monitoring_blue/monitoring_green). Rattachées
+# au topic SNS de monitoring_blue (déjà abonné à alert_email) plutôt que
+# d'en créer un 3e : ça éviterait juste une confirmation d'abonnement email
+# supplémentaire pour rien, le topic est un simple canal de diffusion.
+# ============================================================
+
+# Une cible en échec de health check sur la couleur ACTIVE = trafic public
+# impacté alors que l'EC2 elle-même répond (ec2-down ne le détecterait pas) :
+# souci applicatif (pod crashloop, service down, healthcheck qui échoue).
+resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_hosts" {
+  for_each = module.alb.target_group_arn_suffixes
+
+  alarm_name        = "${var.project_name}-alb-unhealthy-${each.key}"
+  alarm_description = "La target group ${each.key} de l'ALB a au moins une cible en échec de health check. Si '${each.key}' est la couleur active, le trafic public est impacté malgré une EC2 saine (souci applicatif probable : pod down, service qui ne répond plus). Vérifier kubectl get pods -n hrflow-<env> et les logs des services sur l'instance ${each.key}."
+
+  namespace   = "AWS/ApplicationELB"
+  metric_name = "UnHealthyHostCount"
+
+  dimensions = {
+    TargetGroup  = each.value
+    LoadBalancer = module.alb.arn_suffix
+  }
+
+  statistic           = "Maximum"
+  period              = 60
+  evaluation_periods  = 2
+  datapoints_to_alarm = 2
+
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = 1
+
+  # Pas de donnée = pas de cible enregistrée sur cette target group à cet
+  # instant (ex. couleur idle avant son premier déploiement) : pas une panne.
+  treat_missing_data = "notBreaching"
+
+  alarm_actions = [module.monitoring_blue.sns_topic_arn]
+  ok_actions    = [module.monitoring_blue.sns_topic_arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "alb_5xx_high" {
+  alarm_name        = "${var.project_name}-alb-5xx-high"
+  alarm_description = "L'ALB (${var.project_name}) a renvoyé au moins 5 erreurs HTTP 5xx en provenance des services applicatifs sur les 5 dernières minutes. Vérifier les logs des services (gateway/auth/paie/conges/recrutement) pour identifier le service en échec."
+
+  namespace   = "AWS/ApplicationELB"
+  metric_name = "HTTPCode_Target_5XX_Count"
+
+  dimensions = {
+    LoadBalancer = module.alb.arn_suffix
+  }
+
+  statistic = "Sum"
+  # Fenêtre unique de 5 min (period=300, evaluation_periods=1) plutôt que 5
+  # périodes d'1 min à >=5 chacune : sinon le seuil réel serait un cumul de
+  # ~25 erreurs sur 5 min au lieu des 5 erreurs/5min visées.
+  period              = 300
+  evaluation_periods  = 1
+  datapoints_to_alarm = 1
+
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = 5
+
+  treat_missing_data = "notBreaching"
+
+  alarm_actions = [module.monitoring_blue.sns_topic_arn]
+  ok_actions    = [module.monitoring_blue.sns_topic_arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "alb_latency_high" {
+  alarm_name        = "${var.project_name}-alb-latency-high"
+  alarm_description = "Le temps de réponse moyen des cibles derrière l'ALB (${var.project_name}) dépasse 2s depuis 5 minutes. Dégradation de performance perçue par les utilisateurs. Vérifier la charge CPU/mémoire des pods et l'état de la base RDS."
+
+  namespace   = "AWS/ApplicationELB"
+  metric_name = "TargetResponseTime"
+
+  dimensions = {
+    LoadBalancer = module.alb.arn_suffix
+  }
+
+  statistic           = "Average"
+  period              = 60
+  evaluation_periods  = 5
+  datapoints_to_alarm = 5
+
+  comparison_operator = "GreaterThanThreshold"
+  threshold           = 2
+
+  treat_missing_data = "notBreaching"
+
+  alarm_actions = [module.monitoring_blue.sns_topic_arn]
+  ok_actions    = [module.monitoring_blue.sns_topic_arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "rds_cpu_high" {
+  alarm_name        = "${var.project_name}-rds-cpu-high"
+  alarm_description = "La base RDS (${module.rds.identifier}) a un CPU moyen > 80% depuis 5 minutes. Vérifier les requêtes lentes/bloquantes (pg_stat_activity) et l'éventuel besoin de scaling."
+
+  namespace   = "AWS/RDS"
+  metric_name = "CPUUtilization"
+
+  dimensions = {
+    DBInstanceIdentifier = module.rds.identifier
+  }
+
+  statistic           = "Average"
+  period              = 60
+  evaluation_periods  = 5
+  datapoints_to_alarm = 5
+
+  comparison_operator = "GreaterThanThreshold"
+  threshold           = 80
+
+  treat_missing_data = "notBreaching"
+
+  alarm_actions = [module.monitoring_blue.sns_topic_arn]
+  ok_actions    = [module.monitoring_blue.sns_topic_arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "rds_storage_low" {
+  alarm_name        = "${var.project_name}-rds-storage-low"
+  alarm_description = "La base RDS (${module.rds.identifier}) a moins de 2 Go d'espace disque libre (< 10% des 20 Go alloués). Risque d'arrêt de la base si non traité. Vérifier la console RDS → Storage et envisager une augmentation de allocated_storage."
+
+  namespace   = "AWS/RDS"
+  metric_name = "FreeStorageSpace"
+
+  dimensions = {
+    DBInstanceIdentifier = module.rds.identifier
+  }
+
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  datapoints_to_alarm = 2
+
+  comparison_operator = "LessThanThreshold"
+  threshold           = 2 * 1024 * 1024 * 1024 # 2 Go, en octets (unité native FreeStorageSpace)
+
+  # Absence de métrique sur une ressource censée toujours en émettre = signal
+  # à part entière (instance possiblement indisponible), donc on alerte.
+  treat_missing_data = "breaching"
+
+  alarm_actions = [module.monitoring_blue.sns_topic_arn]
+  ok_actions    = [module.monitoring_blue.sns_topic_arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "rds_memory_low" {
+  alarm_name        = "${var.project_name}-rds-memory-low"
+  alarm_description = "La base RDS (${module.rds.identifier}, db.t4g.micro) a moins de 150 Mo de mémoire libre depuis 3 minutes. Risque de pression mémoire/OOM sur une instance à faible RAM. Vérifier les connexions actives et les requêtes en cours."
+
+  namespace   = "AWS/RDS"
+  metric_name = "FreeableMemory"
+
+  dimensions = {
+    DBInstanceIdentifier = module.rds.identifier
+  }
+
+  statistic           = "Average"
+  period              = 60
+  evaluation_periods  = 3
+  datapoints_to_alarm = 3
+
+  comparison_operator = "LessThanThreshold"
+  threshold           = 150 * 1024 * 1024 # 150 Mo, en octets (unité native FreeableMemory)
+
+  treat_missing_data = "notBreaching"
+
+  alarm_actions = [module.monitoring_blue.sns_topic_arn]
+  ok_actions    = [module.monitoring_blue.sns_topic_arn]
+}
+
 output "rds_endpoint" {
   value = module.rds.endpoint
 }

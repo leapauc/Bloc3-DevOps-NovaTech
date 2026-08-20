@@ -15,3 +15,8 @@ output "port" {
 output "db_name" {
   value = aws_db_instance.postgres.db_name
 }
+
+output "identifier" {
+  description = "Identifiant de l'instance RDS (dimension CloudWatch DBInstanceIdentifier)"
+  value       = aws_db_instance.postgres.identifier
+}

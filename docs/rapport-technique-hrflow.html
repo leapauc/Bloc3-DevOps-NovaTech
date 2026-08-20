@@ -1,0 +1,2279 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Rapport technique — HRFlow</title>
+
+  <style>
+    :root {
+      --bg: #f4f8fb;
+      --bg-soft: #eef5f8;
+      --surface: #ffffff;
+      --surface-soft: #f8fbfd;
+
+      --text: #102a43;
+      --text-dark: #0b1f33;
+      --muted: #6b8296;
+
+      --accent: #19b7aa;
+      --accent-dark: #108c84;
+      --accent-soft: #e2f7f4;
+
+      --blue: #4385f5;
+      --blue-soft: #e9f0ff;
+
+      --purple: #8067e8;
+      --purple-soft: #eeeafd;
+
+      --orange: #f28b5f;
+      --orange-soft: #fff0e9;
+
+      --red: #df5b62;
+      --red-soft: #fdebed;
+
+      --green: #2ca66f;
+      --green-soft: #e7f7ef;
+
+      --border: #dce7ee;
+
+      --shadow:
+        0 20px 55px rgba(16, 42, 67, 0.08);
+
+      --shadow-hover:
+        0 24px 65px rgba(16, 42, 67, 0.13);
+
+      --radius: 26px;
+
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+
+      background:
+        radial-gradient(
+          circle at 8% 0%,
+          rgba(25, 183, 170, 0.10),
+          transparent 28%
+        ),
+        radial-gradient(
+          circle at 92% 8%,
+          rgba(67, 133, 245, 0.08),
+          transparent 30%
+        ),
+        linear-gradient(
+          180deg,
+          #f8fbfd 0%,
+          #eef4f7 100%
+        );
+
+      color: var(--text);
+      line-height: 1.65;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    code {
+      padding: 0.12rem 0.35rem;
+
+      border-radius: 6px;
+
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+
+      color: var(--accent-dark);
+
+      font-family:
+        SFMono-Regular,
+        Consolas,
+        "Liberation Mono",
+        Menlo,
+        monospace;
+
+      font-size: 0.9em;
+    }
+
+    /* =========================================================
+       GLOBAL CONTAINER
+    ========================================================= */
+
+    .container {
+      width: min(1220px, calc(100% - 48px));
+      margin: 0 auto;
+    }
+
+    /* =========================================================
+       HEADER
+    ========================================================= */
+
+    header {
+      position: relative;
+      overflow: hidden;
+
+      background: transparent;
+      border-bottom: 0;
+    }
+
+    header::before {
+      content: "";
+
+      position: absolute;
+
+      width: 480px;
+      height: 480px;
+
+      border-radius: 50%;
+
+      background:
+        radial-gradient(
+          circle,
+          rgba(25, 183, 170, 0.12),
+          transparent 68%
+        );
+
+      top: -330px;
+      left: calc(50% - 240px);
+
+      pointer-events: none;
+    }
+
+    .header-inner {
+      position: relative;
+
+      padding: 4.5rem 0 3rem;
+
+      display: flex;
+
+      justify-content: space-between;
+      align-items: flex-start;
+
+      gap: 2rem;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+
+      padding: 0.45rem 0.9rem;
+
+      border-radius: 999px;
+
+      background: var(--accent-soft);
+
+      color: var(--accent-dark);
+
+      border: 1px solid rgba(25, 183, 170, 0.18);
+
+      font-size: 0.82rem;
+      font-weight: 800;
+
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+
+      margin-bottom: 1.25rem;
+    }
+
+    .eyebrow-dot {
+      width: 8px;
+      height: 8px;
+
+      border-radius: 50%;
+
+      background: var(--accent);
+
+      box-shadow:
+        0 0 0 4px rgba(25, 183, 170, 0.12);
+    }
+
+    h1 {
+      margin: 0;
+
+      color: var(--text-dark);
+
+      font-size: clamp(2.7rem, 5vw, 4.2rem);
+
+      line-height: 1.08;
+
+      letter-spacing: -0.045em;
+    }
+
+    .intro {
+      max-width: 780px;
+
+      margin: 1.25rem 0 0;
+
+      color: var(--muted);
+
+      font-size: 1.08rem;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+
+      gap: 0.7rem;
+
+      margin-top: 1.5rem;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+
+      padding: 0.55rem 0.9rem;
+
+      border-radius: 999px;
+
+      background: rgba(255, 255, 255, 0.82);
+
+      border: 1px solid var(--border);
+
+      color: var(--muted);
+
+      font-size: 0.86rem;
+      font-weight: 650;
+
+      box-shadow:
+        0 6px 20px rgba(16, 42, 67, 0.04);
+    }
+
+    .status-box {
+      min-width: 245px;
+
+      padding: 1.4rem;
+
+      border-radius: 22px;
+
+      background:
+        linear-gradient(
+          135deg,
+          var(--accent-soft),
+          #f6fffd
+        );
+
+      border: 1px solid rgba(25, 183, 170, 0.20);
+
+      box-shadow:
+        0 12px 35px rgba(16, 42, 67, 0.06);
+    }
+
+    .status-label {
+      color: var(--accent-dark);
+
+      font-size: 0.75rem;
+
+      text-transform: uppercase;
+
+      letter-spacing: 0.08em;
+
+      font-weight: 850;
+    }
+
+    .status-value {
+      margin-top: 0.35rem;
+
+      color: var(--text-dark);
+
+      font-size: 1.85rem;
+
+      line-height: 1;
+
+      font-weight: 850;
+
+      letter-spacing: -0.035em;
+    }
+
+    .status-description {
+      margin-top: 0.55rem;
+
+      color: var(--muted);
+
+      font-size: 0.84rem;
+    }
+
+    /* =========================================================
+       NAVIGATION
+    ========================================================= */
+
+    .nav {
+      position: sticky;
+
+      top: 0;
+
+      z-index: 20;
+
+      background: rgba(255, 255, 255, 0.88);
+
+      backdrop-filter: blur(14px);
+
+      border-top: 1px solid rgba(220, 231, 238, 0.75);
+
+      border-bottom: 1px solid var(--border);
+
+      box-shadow:
+        0 8px 25px rgba(16, 42, 67, 0.04);
+    }
+
+    .nav-inner {
+      display: flex;
+
+      gap: 0.4rem;
+
+      overflow-x: auto;
+
+      padding: 0.7rem 0;
+
+      scrollbar-width: thin;
+    }
+
+    .nav a {
+      white-space: nowrap;
+
+      padding: 0.55rem 0.8rem;
+
+      border-radius: 10px;
+
+      color: var(--muted);
+
+      font-size: 0.82rem;
+      font-weight: 700;
+
+      transition:
+        background 0.2s ease,
+        color 0.2s ease,
+        transform 0.2s ease;
+    }
+
+    .nav a:hover {
+      background: var(--accent-soft);
+
+      color: var(--accent-dark);
+
+      transform: translateY(-1px);
+    }
+
+    /* =========================================================
+       MAIN
+    ========================================================= */
+
+    main {
+      padding: 1rem 0 5rem;
+    }
+
+    section {
+      margin-top: 2rem;
+    }
+
+    section:first-child {
+      margin-top: 0;
+    }
+
+    .section-header {
+      display: flex;
+
+      justify-content: space-between;
+
+      align-items: flex-end;
+
+      gap: 1.5rem;
+
+      margin-bottom: 1.1rem;
+    }
+
+    .section-title {
+      margin: 0;
+
+      color: var(--text-dark);
+
+      font-size: 1.65rem;
+
+      letter-spacing: -0.025em;
+    }
+
+    .section-description {
+      margin: 0.35rem 0 0;
+
+      color: var(--muted);
+
+      font-size: 0.9rem;
+    }
+
+    .section-count {
+      padding: 0.4rem 0.7rem;
+
+      border-radius: 999px;
+
+      background: var(--accent-soft);
+
+      color: var(--accent-dark);
+
+      font-size: 0.76rem;
+
+      font-weight: 750;
+
+      white-space: nowrap;
+    }
+
+    /* =========================================================
+       CARDS
+    ========================================================= */
+
+    .card {
+      background:
+        rgba(255, 255, 255, 0.94);
+
+      border: 1px solid var(--border);
+
+      border-radius: 22px;
+
+      box-shadow: var(--shadow);
+
+      padding: 1.45rem;
+
+      transition:
+        transform 0.25s ease,
+        box-shadow 0.25s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+
+      box-shadow: var(--shadow-hover);
+    }
+
+    .card h2 {
+      margin: 0 0 0.5rem;
+
+      color: var(--text-dark);
+
+      font-size: 1.2rem;
+
+      letter-spacing: -0.02em;
+    }
+
+    .card h3 {
+      margin: 0;
+
+      color: var(--text-dark);
+
+      font-size: 1.05rem;
+    }
+
+    .card p {
+      color: #536b7e;
+
+      font-size: 0.82rem;
+    }
+
+    /* =========================================================
+       KPI
+    ========================================================= */
+
+    .kpi-grid {
+      display: grid;
+
+      grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+      gap: 1.2rem;
+
+      margin-bottom: 2.5rem;
+    }
+
+    .kpi {
+      position: relative;
+
+      overflow: hidden;
+
+      background:
+        rgba(255, 255, 255, 0.94);
+
+      border: 1px solid var(--border);
+
+      border-radius: 22px;
+
+      padding: 1.35rem;
+
+      box-shadow: var(--shadow);
+
+      transition:
+        transform 0.25s ease,
+        box-shadow 0.25s ease;
+    }
+
+    .kpi::after {
+      content: "";
+
+      position: absolute;
+
+      width: 100px;
+      height: 100px;
+
+      border-radius: 50%;
+
+      right: -45px;
+      top: -45px;
+
+      background: var(--accent-soft);
+
+      opacity: 0.65;
+    }
+
+    .kpi:hover {
+      transform: translateY(-2px);
+
+      box-shadow: var(--shadow-hover);
+    }
+
+    .kpi-top {
+      position: relative;
+      z-index: 1;
+
+      display: flex;
+
+      justify-content: space-between;
+
+      align-items: center;
+    }
+
+    .kpi-label {
+      color: var(--muted);
+
+      font-size: 0.82rem;
+
+      font-weight: 700;
+    }
+
+    .kpi-icon {
+      position: relative;
+      z-index: 1;
+
+      display: grid;
+
+      place-items: center;
+
+      width: 40px;
+      height: 40px;
+
+      border-radius: 13px;
+
+      font-size: 1rem;
+
+      font-weight: 900;
+    }
+
+    .kpi-value {
+      position: relative;
+      z-index: 1;
+
+      margin-top: 1rem;
+
+      color: var(--text-dark);
+
+      font-size: 2.25rem;
+
+      line-height: 1;
+
+      font-weight: 850;
+
+      letter-spacing: -0.045em;
+    }
+
+    .kpi-description {
+      position: relative;
+      z-index: 1;
+
+      margin-top: 0.55rem;
+
+      color: var(--muted);
+
+      font-size: 0.76rem;
+    }
+
+    /* =========================================================
+       COLOR UTILITIES
+    ========================================================= */
+
+    .blue {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .green {
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .purple {
+      background: var(--purple-soft);
+      color: var(--purple);
+    }
+
+    .orange {
+      background: var(--orange-soft);
+      color: var(--orange);
+    }
+
+    /* =========================================================
+       SUMMARY
+    ========================================================= */
+
+    .summary-grid {
+      display: grid;
+
+      grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+      gap: 0.9rem;
+
+      margin-top: 1.1rem;
+    }
+
+    .summary-item {
+      padding: 1rem;
+
+      border: 1px solid var(--border);
+
+      border-radius: 14px;
+
+      background: var(--surface-soft);
+
+      transition:
+        border-color 0.2s ease,
+        transform 0.2s ease;
+    }
+
+    .summary-item:hover {
+      border-color: rgba(25, 183, 170, 0.35);
+
+      transform: translateY(-1px);
+    }
+
+    .summary-label {
+      display: block;
+
+      margin-bottom: 0.4rem;
+
+      color: var(--muted);
+
+      font-size: 0.68rem;
+
+      font-weight: 850;
+
+      text-transform: uppercase;
+
+      letter-spacing: 0.06em;
+    }
+
+    .summary-value {
+      color: var(--text-dark);
+
+      font-size: 0.8rem;
+
+      font-weight: 750;
+
+      word-break: break-word;
+    }
+
+    /* =========================================================
+       TABLE
+    ========================================================= */
+
+    .table-wrapper {
+      overflow-x: auto;
+
+      margin-top: 0.8rem;
+
+      border: 1px solid var(--border);
+
+      border-radius: 16px;
+
+      box-shadow:
+        0 5px 18px rgba(16, 42, 67, 0.035);
+    }
+
+    table {
+      width: 100%;
+
+      border-collapse: collapse;
+
+      background: var(--surface);
+
+      font-size: 0.8rem;
+    }
+
+    th,
+    td {
+      padding: 0.8rem 0.9rem;
+
+      text-align: left;
+
+      border-bottom: 1px solid #edf2f5;
+
+      vertical-align: top;
+    }
+
+    th {
+      background:
+        linear-gradient(
+          135deg,
+          #f8fbfd,
+          #f3f8fa
+        );
+
+      color: var(--muted);
+
+      font-size: 0.68rem;
+
+      font-weight: 850;
+
+      text-transform: uppercase;
+
+      letter-spacing: 0.05em;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    tbody tr {
+      transition: background 0.18s ease;
+    }
+
+    tbody tr:hover {
+      background: #fbfefe;
+    }
+
+    td:first-child {
+      color: var(--text-dark);
+
+      font-weight: 750;
+    }
+
+    .mono {
+      font-family:
+        SFMono-Regular,
+        Consolas,
+        "Liberation Mono",
+        Menlo,
+        monospace;
+
+      font-size: 0.68rem;
+    }
+
+    /* =========================================================
+       DEPENDENCY BADGES
+    ========================================================= */
+
+    .dependency {
+      display: inline-flex;
+
+      padding: 0.4rem 0.55rem;
+
+      border-radius: 8px;
+
+      background: var(--blue-soft);
+
+      border: 1px solid rgba(67, 133, 245, 0.12);
+
+      color: #356dc9;
+
+      font-family:
+        SFMono-Regular,
+        Consolas,
+        monospace;
+
+      font-size: 0.68rem;
+
+      font-weight: 750;
+    }
+
+    /* =========================================================
+       TWO COLUMNS
+    ========================================================= */
+
+    .two-columns {
+      display: grid;
+
+      grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+      gap: 1.2rem;
+    }
+
+    /* =========================================================
+       PIPELINE
+    ========================================================= */
+
+    .pipeline-card {
+      padding: 1.8rem;
+    }
+
+    .pipeline {
+      display: flex;
+
+      align-items: flex-start;
+
+      margin-top: 1.7rem;
+    }
+
+    .pipeline-stage {
+      flex: 1;
+
+      position: relative;
+
+      text-align: center;
+    }
+
+    .pipeline-stage:not(:last-child)::after {
+      content: "";
+
+      position: absolute;
+
+      top: 25px;
+
+      left: 70%;
+
+      width: 60%;
+
+      height: 2px;
+
+      background:
+        linear-gradient(
+          90deg,
+          var(--accent),
+          #cfdde5
+        );
+    }
+
+    .stage-icon {
+      position: relative;
+
+      z-index: 2;
+
+      display: grid;
+
+      place-items: center;
+
+      width: 50px;
+      height: 50px;
+
+      margin: auto;
+
+      border: 1px solid rgba(25, 183, 170, 0.22);
+
+      border-radius: 15px;
+
+      background: var(--accent-soft);
+
+      color: var(--accent-dark);
+
+      font-size: 0.82rem;
+
+      font-weight: 850;
+
+      box-shadow:
+        0 8px 20px rgba(25, 183, 170, 0.08);
+    }
+
+    .stage-icon.green {
+      background: var(--green-soft);
+
+      border-color: rgba(44, 166, 111, 0.20);
+
+      color: var(--green);
+    }
+
+    .stage-icon.purple {
+      background: var(--purple-soft);
+
+      border-color: rgba(128, 103, 232, 0.20);
+
+      color: var(--purple);
+    }
+
+    .stage-icon.orange {
+      background: var(--orange-soft);
+
+      border-color: rgba(242, 139, 95, 0.20);
+
+      color: var(--orange);
+    }
+
+    .stage-title {
+      margin-top: 0.7rem;
+
+      color: var(--text-dark);
+
+      font-size: 0.82rem;
+
+      font-weight: 800;
+    }
+
+    .stage-description {
+      max-width: 140px;
+
+      margin: 0.2rem auto 0;
+
+      color: var(--muted);
+
+      font-size: 0.7rem;
+    }
+
+    .gate {
+      display: inline-flex;
+
+      margin-top: 0.5rem;
+
+      padding: 0.35rem 0.55rem;
+
+      border-radius: 999px;
+
+      background: var(--green-soft);
+
+      color: var(--green);
+
+      font-size: 0.62rem;
+
+      font-weight: 850;
+
+      text-transform: uppercase;
+    }
+
+    /* =========================================================
+       UML
+    ========================================================= */
+
+    .uml-container {
+      margin-top: 1.4rem;
+
+      overflow-x: auto;
+
+      border: 1px solid var(--border);
+
+      border-radius: 18px;
+
+      background:
+        linear-gradient(
+          135deg,
+          #f8fbfd,
+          #f2f7f9
+        );
+    }
+
+    .uml {
+      min-width: 850px;
+
+      padding: 1.5rem;
+    }
+
+    .uml-flow {
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      gap: 0;
+    }
+
+    .uml-node {
+      min-width: 130px;
+
+      padding: 0.9rem;
+
+      border: 1px solid var(--border);
+
+      border-radius: 14px;
+
+      background:
+        rgba(255, 255, 255, 0.95);
+
+      text-align: center;
+
+      box-shadow:
+        0 8px 22px rgba(16, 42, 67, 0.06);
+
+      transition:
+        transform 0.2s ease,
+        border-color 0.2s ease;
+    }
+
+    .uml-node:hover {
+      transform: translateY(-2px);
+
+      border-color: rgba(25, 183, 170, 0.35);
+    }
+
+    .uml-node strong {
+      display: block;
+
+      color: var(--text-dark);
+
+      font-size: 0.76rem;
+    }
+
+    .uml-node small {
+      display: block;
+
+      margin-top: 0.25rem;
+
+      color: var(--muted);
+
+      font-size: 0.64rem;
+    }
+
+    .uml-arrow {
+      padding: 0 0.75rem;
+
+      color: var(--accent-dark);
+
+      font-size: 1.15rem;
+
+      font-weight: 800;
+    }
+
+    /* =========================================================
+       CODE
+    ========================================================= */
+
+    .code {
+      overflow-x: auto;
+
+      margin-top: 1rem;
+
+      padding: 1.1rem;
+
+      border: 1px solid #16324a;
+
+      border-radius: 14px;
+
+      background:
+        linear-gradient(
+          135deg,
+          #102a43,
+          #0b1f33
+        );
+
+      color: #d9f7f3;
+
+      font-family:
+        SFMono-Regular,
+        Consolas,
+        "Liberation Mono",
+        Menlo,
+        monospace;
+
+      font-size: 0.72rem;
+
+      line-height: 1.6;
+    }
+
+    /* =========================================================
+       TOOL LIST
+    ========================================================= */
+
+    .tool-list {
+      display: grid;
+
+      gap: 0;
+
+      padding: 0;
+
+      margin: 0.9rem 0 0;
+
+      list-style: none;
+    }
+
+    .tool-item {
+      display: grid;
+
+      grid-template-columns: 125px 1fr;
+
+      gap: 1rem;
+
+      padding: 0.85rem 0;
+
+      border-bottom: 1px solid #edf2f5;
+    }
+
+    .tool-item:last-child {
+      border-bottom: 0;
+    }
+
+    .tool-name {
+      color: var(--accent-dark);
+
+      font-size: 0.76rem;
+
+      font-weight: 850;
+    }
+
+    .tool-description {
+      color: #536b7e;
+
+      font-size: 0.76rem;
+    }
+
+    .tool-description strong {
+      color: var(--text-dark);
+    }
+
+    /* =========================================================
+       CALLOUT
+    ========================================================= */
+
+    .callout {
+      margin-top: 1.4rem;
+
+      padding: 1.1rem 1.25rem;
+
+      border-radius: 18px;
+
+      border: 1px solid rgba(67, 133, 245, 0.18);
+
+      background:
+        linear-gradient(
+          135deg,
+          var(--blue-soft),
+          #f5f8ff
+        );
+    }
+
+    .callout strong {
+      color: #356dc9;
+
+      font-size: 0.88rem;
+    }
+
+    .callout p {
+      margin: 0.35rem 0 0;
+
+      color: #49658b;
+
+      font-size: 0.78rem;
+    }
+
+    /* =========================================================
+       LISTS
+    ========================================================= */
+
+    .card ul:not(.tool-list) {
+      margin: 0.9rem 0 0;
+
+      padding-left: 1.25rem;
+
+      color: #536b7e;
+
+      font-size: 0.78rem;
+    }
+
+    .card ul:not(.tool-list) li {
+      margin: 0.35rem 0;
+    }
+
+    /* =========================================================
+       FOOTER
+    ========================================================= */
+
+    footer {
+      padding: 2rem 0;
+
+      background: transparent;
+
+      border-top: 1px solid var(--border);
+
+      color: var(--muted);
+
+      font-size: 0.75rem;
+    }
+
+    footer .container {
+      display: flex;
+
+      justify-content: space-between;
+
+      align-items: center;
+
+      gap: 1.2rem;
+    }
+
+    /* =========================================================
+       RESPONSIVE
+    ========================================================= */
+
+    @media (max-width: 1050px) {
+      .kpi-grid,
+      .summary-grid {
+        grid-template-columns:
+          repeat(2, minmax(0, 1fr));
+      }
+
+      .pipeline {
+        min-width: 800px;
+      }
+
+      .pipeline-wrapper {
+        overflow-x: auto;
+      }
+    }
+
+    @media (max-width: 800px) {
+      .header-inner {
+        flex-direction: column;
+      }
+
+      .status-box {
+        width: 100%;
+      }
+
+      .two-columns {
+        grid-template-columns: 1fr;
+      }
+
+      .pipeline-card {
+        overflow: hidden;
+      }
+
+      .pipeline {
+        min-width: 720px;
+      }
+
+      .uml {
+        min-width: 800px;
+      }
+    }
+
+    @media (max-width: 650px) {
+      .container {
+        width: min(100% - 28px, 1220px);
+      }
+
+      .header-inner {
+        padding: 3rem 0 2.2rem;
+      }
+
+      h1 {
+        font-size: 2.5rem;
+      }
+
+      .intro {
+        font-size: 0.95rem;
+      }
+
+      .kpi-grid,
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-header {
+        align-items: flex-start;
+
+        flex-direction: column;
+      }
+
+      .section-count {
+        white-space: normal;
+      }
+
+      .tool-item {
+        grid-template-columns: 1fr;
+
+        gap: 0.25rem;
+      }
+
+      .table-wrapper {
+        border-radius: 14px;
+      }
+
+      th,
+      td {
+        padding: 0.7rem;
+      }
+
+      footer .container {
+        flex-direction: column;
+
+        align-items: flex-start;
+      }
+    }
+  
+    /* =========================================================
+       ADDITIONS — variantes réutilisées pour rapport-technique-hrflow
+       (mêmes tokens de couleur que le reste du fichier)
+    ========================================================= */
+
+    .red {
+      background: var(--red-soft);
+      color: var(--red);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+
+    .badge-critical {
+      background: var(--red-soft);
+      color: #bb3d49;
+    }
+
+    .badge-warning {
+      background: var(--orange-soft);
+      color: #c9683f;
+    }
+
+    .badge-minor {
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+    }
+
+    .callout-warn {
+      margin-top: 1.4rem;
+      padding: 1.1rem 1.25rem;
+      border-radius: 18px;
+      border: 1px solid rgba(223, 91, 98, 0.25);
+      background: linear-gradient(135deg, var(--red-soft), #fff7f5);
+    }
+
+    .callout-warn strong {
+      color: #bb3d49;
+      font-size: 0.88rem;
+    }
+
+    .callout-warn p {
+      margin: 0.35rem 0 0;
+      color: #8a4a4f;
+      font-size: 0.78rem;
+    }
+
+    .callout-ok {
+      margin-top: 1.4rem;
+      padding: 1.1rem 1.25rem;
+      border-radius: 18px;
+      border: 1px solid rgba(44, 166, 111, 0.25);
+      background: linear-gradient(135deg, var(--green-soft), #f5fffa);
+    }
+
+    .callout-ok strong {
+      color: #228158;
+      font-size: 0.88rem;
+    }
+
+    .callout-ok p {
+      margin: 0.35rem 0 0;
+      color: #3c6b57;
+      font-size: 0.78rem;
+    }
+
+    .diagram-frame {
+      margin-top: 1.2rem;
+      padding: 1rem;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: #fbfdfe;
+      text-align: center;
+    }
+
+    .diagram-frame img {
+      max-width: 100%;
+      border-radius: 12px;
+    }
+
+    .diagram-caption {
+      margin-top: 0.6rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <!-- =======================================================
+       HEADER
+  ======================================================== -->
+
+  <header>
+    <div class="container header-inner">
+
+      <div>
+
+        <div class="eyebrow">
+          <span class="eyebrow-dot"></span>
+          HRFlow · Architecture &amp; Exploitation
+        </div>
+
+        <h1>Rapport technique</h1>
+
+        <p class="intro">
+          Architecture Blue-Green, pipeline CI/CD, monitoring/alerting et
+          gestion des incidents de la plateforme HRFlow (Novatech) —
+          état au 20 août 2026.
+        </p>
+
+        <div class="meta">
+          <span class="tag">📦 Blue-Green EC2 / k3s</span>
+          <span class="tag">⚙ GitHub Actions</span>
+          <span class="tag">☁ AWS (ALB · RDS · CloudWatch)</span>
+          <span class="tag">🔁 Rollback sans downtime</span>
+        </div>
+
+      </div>
+
+      <div class="status-box">
+        <div class="status-label">
+          RTO rollback
+        </div>
+
+        <div class="status-value">
+          &lt; 1 min
+        </div>
+
+        <div class="status-description">
+          Bascule ALB Blue-Green, sans redéploiement
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+
+  <!-- =======================================================
+       NAVIGATION
+  ======================================================== -->
+
+  <nav class="nav">
+    <div class="container nav-inner">
+      <a href="#synthese">Synthèse</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#cicd">CI/CD</a>
+      <a href="#securite">Sécurité</a>
+      <a href="#monitoring">Monitoring</a>
+      <a href="#incidents">Incidents &amp; rollback</a>
+      <a href="#postmortem">Post-mortem P1</a>
+      <a href="#operationnel">Points récents</a>
+      <a href="#recommandations">Recommandations</a>
+      <a href="#annexes">Annexes</a>
+    </div>
+  </nav>
+
+
+  <main>
+    <div class="container">
+
+      <!-- =====================================================
+           SYNTHESE
+      ====================================================== -->
+
+      <section id="synthese">
+
+        <div class="kpi-grid">
+
+          <div class="kpi">
+            <div class="kpi-top">
+              <span class="kpi-label">Environnements</span>
+              <span class="kpi-icon blue">2</span>
+            </div>
+            <div class="kpi-value">Staging / Prod</div>
+            <div class="kpi-description">
+              Infra Terraform identique, isolée par workspace
+            </div>
+          </div>
+
+          <div class="kpi">
+            <div class="kpi-top">
+              <span class="kpi-label">Alarmes CloudWatch</span>
+              <span class="kpi-icon green">✓</span>
+            </div>
+            <div class="kpi-value">11</div>
+            <div class="kpi-description">
+              EC2, ALB, RDS — email détaillé via SNS
+            </div>
+          </div>
+
+          <div class="kpi">
+            <div class="kpi-top">
+              <span class="kpi-label">Étapes pipeline</span>
+              <span class="kpi-icon purple">→</span>
+            </div>
+            <div class="kpi-value">7</div>
+            <div class="kpi-description">
+              Du push à la mise en production
+            </div>
+          </div>
+
+          <div class="kpi">
+            <div class="kpi-top">
+              <span class="kpi-label">Incident P1 de référence</span>
+              <span class="kpi-icon orange">⏱</span>
+            </div>
+            <div class="kpi-value">3h07</div>
+            <div class="kpi-description">
+              Août 2024 — cf. post-mortem, section dédiée
+            </div>
+          </div>
+
+        </div>
+
+        <article class="card">
+          <div class="callout">
+            <strong>Ce que ce rapport couvre</strong>
+            <p>
+              L'architecture applicative et infrastructure (Blue-Green),
+              le pipeline CI/CD et ses contrôles de sécurité, le dispositif
+              de monitoring/alerting mis en place, la procédure de gestion
+              d'incident et de rollback, le post-mortem de l'incident P1
+              d'août 2024 qui a motivé l'essentiel de ces travaux, ainsi
+              que les points opérationnels traités récemment et les
+              recommandations restantes.
+            </p>
+          </div>
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           ARCHITECTURE
+      ====================================================== -->
+
+      <section id="architecture">
+
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Architecture technique</h2>
+            <p class="section-description">
+              Vue applicative (microservices) et vue infrastructure
+              (Blue-Green EC2/k3s).
+            </p>
+          </div>
+        </div>
+
+        <article class="card">
+          <h3>Vue applicative</h3>
+          <p>
+            Frontend React consommé via un API Gateway (Node.js/Express),
+            routant vers quatre microservices métier partageant une base
+            PostgreSQL et un cache Redis.
+          </p>
+
+          <div class="diagram-frame">
+            <img src="imgs/architecture.png" alt="Architecture applicative HRFlow" />
+            <div class="diagram-caption">
+              Frontend → API Gateway → microservices (Auth, Paie, Congés,
+              Recrutement) → PostgreSQL / Redis
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Composant</th>
+                  <th>Rôle</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Service Auth</td>
+                  <td>JWT (access + refresh), <strong>stateless</strong> — aucune session serveur à répliquer entre couleurs lors d'une bascule</td>
+                </tr>
+                <tr>
+                  <td>Paie / Congés / Recrutement</td>
+                  <td>Logique métier, périmètre de données propre dans PostgreSQL</td>
+                </tr>
+                <tr>
+                  <td>PostgreSQL (RDS)</td>
+                  <td>Base relationnelle <strong>partagée</strong> par tous les services et les deux couleurs</td>
+                </tr>
+                <tr>
+                  <td>Redis</td>
+                  <td>Cache applicatif, déployé par couleur</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h3>Infrastructure — stratégie Blue-Green</h3>
+          <p>
+            Deux instances EC2 indépendantes (Ubuntu 24.04 ARM64 + k3s),
+            une par couleur, dans des zones de disponibilité différentes.
+            Une seule sert le trafic public (<strong>active</strong>), l'autre
+            reçoit le prochain déploiement (<strong>idle</strong>).
+          </p>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ressource</th>
+                  <th>Détail</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Application Load Balancer</td>
+                  <td>Une target group par couleur ; le listener pointe vers la couleur active. URL stable, jamais de changement visible côté utilisateur</td>
+                </tr>
+                <tr>
+                  <td>RDS PostgreSQL (<span class="mono">db.t4g.micro</span>, 20 Go)</td>
+                  <td>Partagée entre les deux couleurs → discipline de migration additive-only obligatoire</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="callout">
+            <strong>Pourquoi Blue-Green</strong>
+            <p>
+              Le déploiement ne touche jamais la couleur qui sert le
+              trafic : nouvelle version déployée + smoke-testée sur l'idle,
+              puis bascule atomique du listener ALB — aucune reconstruction,
+              pas de downtime. Rollback = rebascule vers l'ancienne couleur,
+              toujours active.
+            </p>
+          </div>
+
+          <h3 style="margin-top:1.6rem">Réseau &amp; accès</h3>
+          <ul>
+            <li>Chaque EC2 n'accepte le port 80 que depuis l'ALB (security group) — jamais exposée directement</li>
+            <li>RDS jamais publique — accessible uniquement depuis les EC2 k3s (blue + green)</li>
+            <li>Accès CI aux instances exclusivement via AWS Systems Manager (SSM), pas de SSH exposé</li>
+            <li>HTTPS pas encore configuré (pas de domaine + certificat ACM à ce stade) — trafic servi en HTTP</li>
+          </ul>
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           CI/CD
+      ====================================================== -->
+
+      <section id="cicd">
+
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Pipeline CI/CD</h2>
+            <p class="section-description">
+              Chaîne complète du push à la mise en production, avec une
+              étape d'approbation manuelle avant la bascule prod.
+            </p>
+          </div>
+          <span class="section-count">7 étapes</span>
+        </div>
+
+        <article class="card pipeline-card">
+          <p>
+            Chaque étape doit réussir avant de déclencher la suivante
+            (<span class="mono">pipeline.yml</span>).
+          </p>
+
+          <div class="pipeline-wrapper">
+            <div class="pipeline">
+
+              <div class="pipeline-stage">
+                <div class="stage-icon">01</div>
+                <div class="stage-title">Changes</div>
+                <div class="stage-description">Détecte si e2e/frontend/services sont touchés</div>
+                <span class="gate">Filtre</span>
+              </div>
+
+              <div class="pipeline-stage">
+                <div class="stage-icon green">02</div>
+                <div class="stage-title">CodeQL + Security</div>
+                <div class="stage-description">SAST, npm audit, scan ZAP</div>
+                <span class="gate">Quality Gate</span>
+              </div>
+
+              <div class="pipeline-stage">
+                <div class="stage-icon">03</div>
+                <div class="stage-title">Build-tests</div>
+                <div class="stage-description">Tests unitaires + build frontend</div>
+                <span class="gate">Tests OK</span>
+              </div>
+
+              <div class="pipeline-stage">
+                <div class="stage-icon purple">04</div>
+                <div class="stage-title">Docker</div>
+                <div class="stage-description">Build arm64, scan Trivy, push ECR (tag = SHA)</div>
+                <span class="gate">Image immuable</span>
+              </div>
+
+              <div class="pipeline-stage">
+                <div class="stage-icon orange">05</div>
+                <div class="stage-title">Deploy staging</div>
+                <div class="stage-description">Déploie idle, smoke-test, bascule ALB</div>
+                <span class="gate">Auto</span>
+              </div>
+
+              <div class="pipeline-stage">
+                <div class="stage-icon red">06</div>
+                <div class="stage-title">Approbation</div>
+                <div class="stage-description">GitHub Environment "production", Required reviewers</div>
+                <span class="gate">Manuel</span>
+              </div>
+
+              <div class="pipeline-stage">
+                <div class="stage-icon green">07</div>
+                <div class="stage-title">Deploy production</div>
+                <div class="stage-description">Même mécanique Blue-Green qu'en staging</div>
+                <span class="gate">Release</span>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="callout">
+            <strong>Approbation manuelle avant production</strong>
+            <p>
+              Un push sur <span class="mono">main</span> déclenche staging
+              automatiquement, mais <span class="mono">deploy-production</span>
+              reste en pause (GitHub Environment <span class="mono">production</span>,
+              règle "Required reviewers") jusqu'à validation explicite d'un
+              reviewer autorisé — Actions → Review deployments → Approve
+              and deploy.
+            </p>
+          </div>
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           SECURITE
+      ====================================================== -->
+
+      <section id="securite">
+
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Sécurité</h2>
+            <p class="section-description">
+              Contrôles automatisés intégrés au pipeline, du code source à l'image publiée.
+            </p>
+          </div>
+        </div>
+
+        <article class="card">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Contrôle</th>
+                  <th>Portée</th>
+                  <th>Politique</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>CodeQL</strong></td>
+                  <td>Code applicatif (SAST)</td>
+                  <td>Bloque le pipeline si vulnérabilité détectée</td>
+                </tr>
+                <tr>
+                  <td><strong>npm audit</strong></td>
+                  <td>Dépendances de prod, par service</td>
+                  <td><span class="mono">--audit-level=high</span> — bloque sur high/critical</td>
+                </tr>
+                <tr>
+                  <td><strong>OWASP ZAP</strong></td>
+                  <td>API Gateway (scan dynamique)</td>
+                  <td>Stack complète démarrée via Docker Compose pour le scan</td>
+                </tr>
+                <tr>
+                  <td><strong>Trivy</strong></td>
+                  <td>Images Docker avant push ECR</td>
+                  <td>Rapport CVE HIGH/CRITICAL (gate à activer une fois la liste triée)</td>
+                </tr>
+                <tr>
+                  <td><strong>ECR tag immutability</strong></td>
+                  <td>Registre d'images</td>
+                  <td>Un tag (SHA de commit) ne peut jamais être réécrit — traçabilité garantie</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           MONITORING
+      ====================================================== -->
+
+      <section id="monitoring">
+
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Monitoring &amp; alerting</h2>
+            <p class="section-description">
+              CloudWatch → SNS → email, sans PagerDuty à ce stade.
+            </p>
+          </div>
+          <span class="section-count">11 alarmes</span>
+        </div>
+
+        <article class="card">
+          <div class="callout">
+            <strong>Email plutôt que PagerDuty</strong>
+            <p>
+              La période d'essai PagerDuty (14 jours, droits admin Teams
+              requis) représentait un coût d'intégration disproportionné
+              pour la volumétrie actuelle. Le contenu des emails est rendu
+              explicite via <span class="mono">alarm_description</span>
+              (impact, action à mener) pour compenser l'absence d'un outil
+              d'astreinte dédié.
+            </p>
+          </div>
+
+          <div class="table-wrapper" style="margin-top:1.4rem">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ressource</th>
+                  <th>Métrique</th>
+                  <th>Seuil</th>
+                  <th>Évaluation</th>
+                  <th>Sévérité</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>EC2 (blue+green)</td>
+                  <td>StatusCheckFailed</td>
+                  <td>&gt; 0</td>
+                  <td>3 × 60s</td>
+                  <td><span class="badge badge-critical">Critique</span></td>
+                </tr>
+                <tr>
+                  <td>EC2 (blue+green)</td>
+                  <td>CPUUtilization</td>
+                  <td>&gt; 80 %</td>
+                  <td>5 × 60s (moy.)</td>
+                  <td><span class="badge badge-warning">Warning</span></td>
+                </tr>
+                <tr>
+                  <td>ALB</td>
+                  <td>UnHealthyHostCount</td>
+                  <td>≥ 1</td>
+                  <td>2 × 60s</td>
+                  <td><span class="badge badge-critical">Critique</span></td>
+                </tr>
+                <tr>
+                  <td>ALB</td>
+                  <td>HTTPCode_Target_5XX_Count</td>
+                  <td>≥ 5</td>
+                  <td>1 × 300s (somme)</td>
+                  <td><span class="badge badge-critical">Critique</span></td>
+                </tr>
+                <tr>
+                  <td>ALB</td>
+                  <td>TargetResponseTime</td>
+                  <td>&gt; 2 s</td>
+                  <td>5 × 60s (moy.)</td>
+                  <td><span class="badge badge-warning">Warning</span></td>
+                </tr>
+                <tr>
+                  <td>RDS</td>
+                  <td>CPUUtilization</td>
+                  <td>&gt; 80 %</td>
+                  <td>5 × 60s</td>
+                  <td><span class="badge badge-warning">Warning</span></td>
+                </tr>
+                <tr>
+                  <td>RDS</td>
+                  <td>FreeStorageSpace</td>
+                  <td>&lt; 2 Go</td>
+                  <td>2 × 300s</td>
+                  <td><span class="badge badge-critical">Critique</span></td>
+                </tr>
+                <tr>
+                  <td>RDS</td>
+                  <td>FreeableMemory</td>
+                  <td>&lt; 150 Mo</td>
+                  <td>3 × 60s</td>
+                  <td><span class="badge badge-warning">Warning</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p style="margin-top:1rem; font-size:0.85rem; color:var(--muted)">
+            Détail complet (noms d'alarmes par environnement, commandes de
+            simulation) : <span class="mono">docs/alerting-seuils-simulation.md</span>.
+            Exemple de mail reçu : <span class="mono">docs/exemple-email-alerte.md</span>.
+          </p>
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           INCIDENTS & ROLLBACK
+      ====================================================== -->
+
+      <section id="incidents">
+
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Gestion des incidents &amp; rollback</h2>
+            <p class="section-description">
+              Classification de sévérité et procédure de bascule Blue-Green.
+            </p>
+          </div>
+        </div>
+
+        <article class="card">
+          <h3>Classification de sévérité</h3>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sévérité</th>
+                  <th>Définition</th>
+                  <th>Exemples</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="badge badge-critical">P1 — Critique</span></td>
+                  <td>Trafic public impacté, ou risque imminent de coupure totale</td>
+                  <td>EC2 down / ALB unhealthy sur la couleur <strong>active</strong>, ALB 5xx élevé, RDS storage bas</td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-warning">P2 — Majeur</span></td>
+                  <td>Dégradation de service, sans coupure</td>
+                  <td>CPU EC2/RDS élevé soutenu, latence ALB élevée</td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-minor">P3 — Mineur</span></td>
+                  <td>Aucun impact utilisateur</td>
+                  <td>Toute alarme sur la couleur <strong>idle</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p style="margin-top:1rem">
+            La couleur concernée (active vs idle) change la sévérité réelle
+            d'une alarme identique — première chose à vérifier
+            (<span class="mono">terraform output -raw active_color</span>).
+          </p>
+
+          <h3 style="margin-top:1.6rem">Rollback Blue-Green</h3>
+          <p>
+            <span class="mono">rollback.yml</span> (déclenchement manuel)
+            rebascule le listener ALB vers la couleur non active, qui tourne
+            déjà la dernière version connue-bonne. Aucun redéploiement —
+            juste un changement de cible ALB, effectif en quelques secondes.
+          </p>
+
+          <div class="callout-warn">
+            <strong>Limite importante</strong>
+            <p>
+              La RDS est partagée entre les deux couleurs : un rollback ALB
+              ne résout rien pour un incident d'origine RDS (espace disque,
+              CPU, mémoire) — il faut traiter la base directement.
+            </p>
+          </div>
+
+          <p style="margin-top:1rem; font-size:0.85rem; color:var(--muted)">
+            Procédure détaillée pas-à-pas : <span class="mono">docs/RUNBOOK-INCIDENT.md</span>.
+          </p>
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           POST-MORTEM
+      ====================================================== -->
+
+      <section id="postmortem">
+
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Post-mortem incident P1 — 14/15 août 2024</h2>
+            <p class="section-description">
+              Reconstitué depuis <span class="mono">docs/old/incident-aout-2024.md</span>,
+              référence historique ayant motivé l'essentiel des travaux décrits ici.
+            </p>
+          </div>
+          <span class="section-count">3h07 d'indisponibilité</span>
+        </div>
+
+        <article class="card">
+          <div class="summary-grid">
+            <div class="summary-item">
+              <span class="summary-label">Rédigé par</span>
+              <span class="summary-value">Karim Bouaziz (CEO)</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Durée</span>
+              <span class="summary-value">3h07 (23h47 → 02h54)</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Utilisateurs impactés</span>
+              <span class="summary-value">8 200</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Conséquence RH</span>
+              <span class="summary-value">Départ du CTO le 26 août</span>
+            </div>
+          </div>
+
+          <div class="callout">
+            <strong>Résumé</strong>
+            <p>
+              Coupure totale de HRFlow pendant 3h07, causée par une
+              migration de base de données déclenchée manuellement en
+              production à 23h30.
+            </p>
+          </div>
+
+          <h3 style="margin-top:1.6rem">Chronologie</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Heure</th>
+                  <th>Événement</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>23h30</td><td>Migration SQL lancée manuellement en production via <span class="mono">/paie/migrate</span></td></tr>
+                <tr><td>23h47</td><td>La migration corrompt la table <span class="mono">employees</span> — plateforme hors service</td></tr>
+                <tr><td>23h47</td><td>Aucune alerte automatique déclenchée, personne notifié</td></tr>
+                <tr><td>02h15</td><td>Un client hôtelier appelle le numéro d'urgence</td></tr>
+                <tr><td>02h22</td><td>Le CEO réveille le développeur d'astreinte</td></tr>
+                <tr><td>02h25</td><td>Tentative de rollback — aucune procédure documentée</td></tr>
+                <tr><td>02h54</td><td>Restauration d'un backup de 22h30 — perte de 1h17 de données</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3 style="margin-top:1.6rem">Causes racines</h3>
+          <ol>
+            <li>Route <span class="mono">/paie/migrate</span> accessible sans authentification</li>
+            <li>Aucun test avant exécution en production</li>
+            <li>Pas de backup récent disponible</li>
+            <li>Aucun monitoring ni alerting</li>
+            <li>Procédure de rollback inexistante</li>
+          </ol>
+
+          <h3 style="margin-top:1.6rem">Ce qui a changé depuis</h3>
+          <p>
+            Contrairement aux actions décidées en 2024 (jamais mises en
+            œuvre — le CTO étant parti avant d'agir), l'architecture
+            actuelle répond directement à chaque cause racine :
+          </p>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cause racine (2024)</th>
+                  <th>Réponse actuelle</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Déploiement/migration manuelle non contrôlée</td>
+                  <td>Seul chemin de déploiement : la CI ; <span class="mono">deploy-production</span> nécessite une approbation manuelle explicite, tracée</td>
+                </tr>
+                <tr>
+                  <td>Aucun monitoring/alerting</td>
+                  <td>11 alarmes CloudWatch actives avec notification email détaillée</td>
+                </tr>
+                <tr>
+                  <td>Procédure de rollback inexistante</td>
+                  <td><span class="mono">rollback.yml</span> — bascule Blue-Green en quelques secondes, procédure documentée</td>
+                </tr>
+                <tr>
+                  <td>Pas de backup récent</td>
+                  <td>RDS géré (backups automatiques AWS) — rétention à formaliser, cf. recommandations</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           POINTS OPERATIONNELS
+      ====================================================== -->
+
+      <section id="operationnel">
+
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Points opérationnels traités récemment</h2>
+            <p class="section-description">
+              Trois sujets concrets résolus pendant la mise en place de ce dispositif.
+            </p>
+          </div>
+        </div>
+
+        <article class="card">
+          <h3>Tag ECR immuable et pushes concurrents</h3>
+          <p>
+            Le repository ECR est configuré en <span class="mono">image-tag-mutability=IMMUTABLE</span>.
+            Le pattern de travail (branche <span class="mono">dev-*</span>
+            fast-forwardée vers <span class="mono">main</span>, sans commit
+            de merge) fait que le pipeline se déclenche deux fois pour le
+            même commit SHA — le second push Docker échoue alors car le tag
+            existe déjà.
+          </p>
+          <div class="callout">
+            <strong>Contournement / amélioration identifiée</strong>
+            <p>
+              Un nouveau commit change le SHA et débloque immédiatement.
+              Amélioration durable identifiée : vérifier l'existence du tag
+              avant build/push dans <span class="mono">docker.yml</span> et
+              skip proprement si déjà présent.
+            </p>
+          </div>
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           RECOMMANDATIONS
+      ====================================================== -->
+
+      <section id="recommandations">
+
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Recommandations &amp; prochaines étapes</h2>
+            <p class="section-description">
+              Ce qui reste à traiter pour consolider le dispositif actuel.
+            </p>
+          </div>
+        </div>
+
+        <article class="card">
+          <ol>
+            <li>Confirmer les abonnements SNS restants (email de confirmation à valider)</li>
+            <li>Déployer les nouvelles alarmes (CPU, ALB, RDS) en production — seule <span class="mono">ec2-down</span> y est active pour l'instant</li>
+            <li>Rendre le job <span class="mono">docker</span> idempotent (vérifier l'existence du tag ECR avant build/push)</li>
+            <li>Activer le blocage strict Trivy (<span class="mono">exit-code: 1</span>) une fois la première liste de CVE triée</li>
+            <li>Formaliser/vérifier la politique de sauvegarde RDS (rétention actuelle : 3 jours) au regard du RPO attendu</li>
+            <li>Mettre en place HTTPS (nom de domaine + certificat ACM)</li>
+            <li>Réévaluer PagerDuty si l'astreinte doit devenir formelle au-delà d'une notification email</li>
+          </ol>
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           ANNEXES
+      ====================================================== -->
+
+      <section id="annexes">
+
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Annexes</h2>
+          </div>
+        </div>
+
+        <article class="card">
+          <h3>URLs des environnements</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Environnement</th><th>URL</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Staging</td><td class="mono">http://my-project-alb-843501151.eu-west-3.elb.amazonaws.com</td></tr>
+                <tr><td>Production</td><td class="mono">http://hrflow-production-alb-568207110.eu-west-3.elb.amazonaws.com</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3 style="margin-top:1.6rem">Documents liés</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Document</th><th>Contenu</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="mono">docs/alerting-seuils-simulation.md</td><td>Seuils, noms d'alarmes complets, commandes de simulation</td></tr>
+                <tr><td class="mono">docs/exemple-email-alerte.md</td><td>Format exact d'un email d'alerte reçu</td></tr>
+                <tr><td class="mono">docs/RUNBOOK-INCIDENT.md</td><td>Procédure pas-à-pas, de la détection au rollback</td></tr>
+                <tr><td class="mono">docs/old/incident-aout-2024.md</td><td>Post-mortem original de l'incident du 14/15 août 2024</td></tr>
+                <tr><td class="mono">README.md / README_en.md</td><td>Documentation générale du projet (FR/EN)</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3 style="margin-top:1.6rem">Compte AWS</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Élément</th><th>Valeur</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Région</td><td>eu-west-3 (Paris)</td></tr>
+                <tr><td>Compte AWS</td><td class="mono">079716036671</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+      </section>
+
+    </div>
+  </main>
+
+
+  <footer>
+    <div class="container">
+      <span>HRFlow · Architecture &amp; Exploitation</span>
+      <span>Rapport technique · Version 1.0 · 20 août 2026</span>
+    </div>
+  </footer>
+
+</body>
+
+</html>

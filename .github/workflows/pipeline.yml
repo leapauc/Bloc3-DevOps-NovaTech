@@ -72,12 +72,7 @@ jobs:
 
   # docker.yml tague et déploie toujours avec le SHA du commit courant : il doit
   # donc tourner (et pousser une image) à chaque push sur dev-*/main, même quand
-  # seul un fichier CI/Terraform a changé. Avant, ce job était sauté dès que
-  # aucun Dockerfile n'était modifié (docker_changed == 'true' requis) — un
-  # commit qui ne touchait ni Dockerfile ni docker.yml ne poussait alors aucune
-  # image pour son SHA, alors que deploy-staging/production continuaient (un job
-  # "skipped" n'est pas un "failure") et tentaient de pull une image jamais
-  # construite : ImagePullBackOff garanti sur les 4 services back.
+  # seul un fichier CI/Terraform a changé. 
   docker:
     needs: [build-tests, changes]
     if: >

@@ -154,7 +154,7 @@ Points clés :
 
 Le pipeline (`.github/workflows/pipeline.yml`) s'enchaîne ainsi sur un push :
 
-`changes` → `codeql` + `security` → `build-tests` → `docker` → `deploy-staging` (branches `dev-*` et `main`) → `deploy-production` (branche `main` uniquement)
+`changes` → `codeql` + `security` → `build-tests` → `docker` → `deploy-staging` (branches `dev-*` et `main`) → `deploy-production` (branche `main` uniquement, **approbation manuelle requise**)
 
 Chaque étape `deploy-*` (`.github/workflows/deploy.yml`) :
 1. Provisionne/synchronise l'infra Terraform de l'environnement (crée Green si besoin, jamais Blue directement — voir plus haut).
@@ -162,7 +162,7 @@ Chaque étape `deploy-*` (`.github/workflows/deploy.yml`) :
 3. Smoke-teste la couleur idle.
 4. Bascule le listener ALB vers la couleur idle (elle devient active).
 
-⚠️ **Un push sur `main` déclenche automatiquement `deploy-staging` PUIS `deploy-production`, sans étape d'approbation manuelle.** Toute PR mergée sur `main` part donc en production dès que le pipeline passe.
+✅ **Un push sur `main` déclenche automatiquement `deploy-staging`, puis lance `deploy-production` — mais ce dernier reste en pause tant qu'un reviewer autorisé n'a pas validé le déploiement.** Le job `deploy-production` tourne sur le GitHub Environment `production`, protégé par une règle **Required reviewers** (Settings → Environments → `production`). Toute PR mergée sur `main` déclenche donc bien staging automatiquement, mais la mise en production effective (provisioning + déploiement + bascule ALB) attend une approbation manuelle : onglet **Actions** du run → **Review deployments** → **Approve and deploy**.
 
 ### Rollback
 
@@ -187,7 +187,7 @@ HTTPS n'est pas encore configuré (`certificate_arn` vide dans les `*.tfvars`) �
 
 ### Branches
 
-- `main` : branche de production. Un push dessus déclenche staging **et** production — ne jamais pusher directement, toujours passer par une Pull Request.
+- `main` : branche de production. Un push dessus déclenche staging automatiquement, puis production **en attente d'approbation manuelle** — ne jamais pusher directement, toujours passer par une Pull Request.
 - `dev-<identifiant>` (ex. `dev-lpa`) : branche de travail individuelle. Un push dessus déclenche un déploiement staging.
 - `feature/<nom>` : branche de fonctionnalité plus large, mergée dans une branche `dev-*` ou dans `main` via PR.
 
@@ -217,6 +217,6 @@ Le `scope` est optionnel (ex. `fix(cd): fix cd traefic`, `refacto(infra): try Bl
 2. S'assurer que le pipeline (`codeql`, `security`, `build-tests`) passe avant de demander une review.
 3. Ne jamais commit de secret — utiliser les GitHub Actions Secrets pour tout ce qui touche AWS/DB/JWT/Stripe.
 4. Documenter les décisions d'infrastructure non triviales directement en commentaire dans le `.tf` concerné (convention déjà en place dans `terraform/`).
-5. Merger dans `main` seulement quand on est prêt pour une mise en production (cf. avertissement CI/CD ci-dessus).
+5. Merger dans `main` seulement quand on est prêt pour une mise en production : staging se déploiera automatiquement, mais la bascule en production attendra l'approbation manuelle d'un reviewer autorisé (cf. section CI/CD ci-dessus).
 
 

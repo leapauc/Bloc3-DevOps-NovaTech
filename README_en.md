@@ -154,7 +154,7 @@ Key points:
 
 The pipeline (`.github/workflows/pipeline.yml`) chains as follows on a push:
 
-`changes` → `codeql` + `security` → `build-tests` → `docker` → `deploy-staging` (branches `dev-*` and `main`) → `deploy-production` (`main` branch only)
+`changes` → `codeql` + `security` → `build-tests` → `docker` → `deploy-staging` (branches `dev-*` and `main`) → `deploy-production` (`main` branch only, **manual approval required**)
 
 Each `deploy-*` step (`.github/workflows/deploy.yml`):
 1. Provisions/syncs the environment's Terraform infra (creates Green if needed, never touches Blue directly — see above).
@@ -162,7 +162,7 @@ Each `deploy-*` step (`.github/workflows/deploy.yml`):
 3. Smoke-tests the idle color.
 4. Switches the ALB listener to the idle color (it becomes active).
 
-⚠️ **A push on `main` automatically triggers `deploy-staging` THEN `deploy-production`, with no manual approval step.** Any PR merged into `main` therefore ships to production as soon as the pipeline passes.
+✅ **A push on `main` automatically triggers `deploy-staging`, then starts `deploy-production` — but the latter stays paused until an authorized reviewer approves the deployment.** The `deploy-production` job runs against the GitHub Environment `production`, protected by a **Required reviewers** rule (Settings → Environments → `production`). Any PR merged into `main` does trigger staging automatically, but the actual production rollout (provisioning + deployment + ALB switch) waits for manual approval: **Actions** tab on the run → **Review deployments** → **Approve and deploy**.
 
 ### Rollback
 
@@ -187,7 +187,7 @@ HTTPS isn't configured yet (`certificate_arn` is empty in the `*.tfvars` files) 
 
 ### Branches
 
-- `main`: production branch. A push here triggers staging **and** production — never push directly, always go through a Pull Request.
+- `main`: production branch. A push here triggers staging automatically, then production **pending manual approval** — never push directly, always go through a Pull Request.
 - `dev-<id>` (e.g. `dev-lpa`): individual working branch. A push here triggers a staging deployment.
 - `feature/<name>`: larger feature branch, merged into a `dev-*` branch or into `main` via PR.
 
@@ -217,5 +217,5 @@ The `scope` is optional (e.g. `fix(cd): fix cd traefic`, `refacto(infra): try Bl
 2. Make sure the pipeline (`codeql`, `security`, `build-tests`) passes before requesting a review.
 3. Never commit a secret — use GitHub Actions Secrets for anything touching AWS/DB/JWT/Stripe.
 4. Document non-trivial infrastructure decisions directly as comments in the relevant `.tf` file (existing convention in `terraform/`).
-5. Merge into `main` only when ready to ship to production (see the CI/CD warning above).
+5. Merge into `main` only when ready to ship to production: staging deploys automatically, but the production switch waits for an authorized reviewer's manual approval (see the CI/CD section above).
 

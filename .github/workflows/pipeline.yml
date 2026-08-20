@@ -6,12 +6,14 @@ on:
       - '**'
     paths-ignore:
       - '**/*.md'
+      - '**/*.html'
   pull_request:
     branches:
       - main
       - master
     paths-ignore:
       - '**/*.md'
+      - '**/*.html'
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Runbook Incident — HRFlow</title>
+
+  <style>
+    :root {
+      --bg: #f4f8fb;
+      --bg-soft: #eef5f8;
+      --card: #ffffff;
+      --text: #102a43;
+      --text-dark: #0b1f33;
+      --muted: #6b8296;
+
+      --accent: #19b7aa;
+      --accent-dark: #108c84;
+      --accent-soft: #e2f7f4;
+
+      --blue: #4385f5;
+      --blue-soft: #e9f0ff;
+
+      --purple: #8067e8;
+      --purple-soft: #eeeafd;
+
+      --orange: #f28b5f;
+      --orange-soft: #fff0e9;
+
+      --red: #df5b62;
+      --red-soft: #fdebed;
+
+      --green: #2ca66f;
+      --green-soft: #e7f7ef;
+
+      --border: #dce7ee;
+      --shadow: 0 20px 55px rgba(16, 42, 67, 0.08);
+      --shadow-hover: 0 24px 65px rgba(16, 42, 67, 0.13);
+
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(
+          circle at 10% 0%,
+          rgba(223, 91, 98, 0.08),
+          transparent 28%
+        ),
+        radial-gradient(
+          circle at 90% 10%,
+          rgba(67, 133, 245, 0.08),
+          transparent 30%
+        ),
+        linear-gradient(180deg, #f8fbfd 0%, #eef4f7 100%);
+      color: var(--text);
+      line-height: 1.65;
+    }
+
+    /* -------------------------
+       HEADER
+    ------------------------- */
+
+    header {
+      padding: 4.5rem 2rem 3rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    header::before {
+      content: "";
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      background: rgba(223, 91, 98, 0.07);
+      filter: blur(2px);
+      top: -280px;
+      left: calc(50% - 210px);
+      pointer-events: none;
+    }
+
+    .header-content {
+      position: relative;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      background: var(--red-soft);
+      color: #bb3d49;
+      border: 1px solid rgba(223, 91, 98, 0.2);
+      font-size: 0.82rem;
+      font-weight: 750;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 1.25rem;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 0 4px rgba(223, 91, 98, 0.14);
+    }
+
+    h1 {
+      margin: 0;
+      color: var(--text-dark);
+      font-size: clamp(2.2rem, 4.6vw, 3.8rem);
+      line-height: 1.1;
+      letter-spacing: -0.045em;
+    }
+
+    .title-highlight {
+      color: var(--accent-dark);
+    }
+
+    .intro {
+      max-width: 800px;
+      margin: 1.25rem auto 0;
+      color: var(--muted);
+      font-size: 1.08rem;
+    }
+
+    .meta {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-top: 1.5rem;
+    }
+
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.55rem 0.9rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.8);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.88rem;
+      box-shadow: 0 6px 20px rgba(16,42,67,0.04);
+    }
+
+    .meta-pill strong {
+      color: var(--text);
+      margin-left: 0.3rem;
+    }
+
+    /* -------------------------
+       LAYOUT
+    ------------------------- */
+
+    main {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 0 1.5rem 4rem;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.94);
+      border: 1px solid var(--border);
+      border-radius: 26px;
+      box-shadow: var(--shadow);
+      padding: 2rem;
+      transition:
+        transform 0.25s ease,
+        box-shadow 0.25s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .card + .card {
+      margin-top: 1.5rem;
+    }
+
+    .section-number {
+      display: inline-flex;
+      width: 36px;
+      height: 36px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 11px;
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+      font-weight: 800;
+      font-size: 0.9rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .card h2 {
+      margin: 0 0 0.65rem;
+      color: var(--text-dark);
+      font-size: 1.55rem;
+      letter-spacing: -0.025em;
+    }
+
+    .card h3 {
+      color: var(--text-dark);
+      margin-top: 1.6rem;
+      margin-bottom: 0.5rem;
+      font-size: 1.05rem;
+    }
+
+    .card p {
+      color: var(--muted);
+    }
+
+    .card code {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.1rem 0.4rem;
+      font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.87em;
+      color: var(--text-dark);
+    }
+
+    /* -------------------------
+       CALLOUT
+    ------------------------- */
+
+    .callout {
+      margin-top: 1.4rem;
+      padding: 1.1rem 1.25rem;
+      border-radius: 18px;
+      border: 1px solid rgba(67, 133, 245, 0.18);
+      background: linear-gradient(135deg, var(--blue-soft), #f5f8ff);
+    }
+
+    .callout strong {
+      display: block;
+      color: #356dc9;
+      font-size: 0.88rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .callout p {
+      margin: 0.2rem 0 0;
+      color: #49658b;
+      font-size: 0.88rem;
+    }
+
+    .callout-warning {
+      border-color: rgba(223, 91, 98, 0.22);
+      background: linear-gradient(135deg, var(--red-soft), #fff8f8);
+    }
+
+    .callout-warning strong {
+      color: #bb3d49;
+    }
+
+    .callout-warning p {
+      color: #8d4650;
+    }
+
+    /* -------------------------
+       SEVERITY BADGES
+    ------------------------- */
+
+    .severity {
+      display: inline-flex;
+      padding: 0.35rem 0.65rem;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    .severity-critical {
+      color: #bb3d49;
+      background: var(--red-soft);
+    }
+
+    .severity-major {
+      color: #c9683f;
+      background: var(--orange-soft);
+    }
+
+    .severity-minor {
+      color: var(--muted);
+      background: #edf1f4;
+    }
+
+    /* -------------------------
+       TABLE
+    ------------------------- */
+
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 1.3rem;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+    }
+
+    table {
+      width: 100%;
+      min-width: 700px;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 1rem 0.9rem;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid #e7eef3;
+    }
+
+    th {
+      background: #f6f9fb;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    tbody tr:hover {
+      background: #fbfdfe;
+    }
+
+    td strong {
+      color: var(--text-dark);
+    }
+
+    td code {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.1rem 0.4rem;
+      font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.85em;
+      color: var(--text-dark);
+    }
+
+    /* -------------------------
+       CODE
+    ------------------------- */
+
+    .code {
+      display: block;
+      overflow-x: auto;
+      background: #102a43;
+      border-radius: 18px;
+      padding: 1.2rem 1.3rem;
+      color: #d9f6f2;
+      font-family:
+        SFMono-Regular,
+        Consolas,
+        "Liberation Mono",
+        Menlo,
+        monospace;
+      font-size: 0.85rem;
+      line-height: 1.65;
+      margin-top: 1rem;
+      white-space: pre;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+
+    .code-comment {
+      color: #6fa89f;
+    }
+
+    /* -------------------------
+       PHASE (procedure steps)
+    ------------------------- */
+
+    .phase {
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      margin-top: 1.2rem;
+    }
+
+    .phase-header {
+      padding: 0.9rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+      background: linear-gradient(135deg, #f8fbfd, #f3f8fa);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .phase-number {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 11px;
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+      font-size: 0.8rem;
+      font-weight: 850;
+    }
+
+    .phase-title {
+      color: var(--text-dark);
+      font-weight: 800;
+      font-size: 0.98rem;
+    }
+
+    .phase-body {
+      padding: 1rem 1.25rem 1.25rem;
+    }
+
+    .phase-body p {
+      margin: 0 0 0.6rem;
+    }
+
+    .phase-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    .phase-body ul {
+      margin: 0.4rem 0 0.6rem;
+      padding-left: 1.2rem;
+      color: var(--muted);
+    }
+
+    .phase-body li {
+      margin-bottom: 0.35rem;
+    }
+
+    /* -------------------------
+       DECISION TREE
+    ------------------------- */
+
+    .decision-tree {
+      margin-top: 1.4rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    .decision-root {
+      padding: 1rem 1.4rem;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #f8fbfd, #eef4f7);
+      border: 1px solid var(--border);
+      color: var(--text-dark);
+      font-weight: 800;
+      font-size: 0.95rem;
+      text-align: center;
+      max-width: 520px;
+    }
+
+    .decision-connector {
+      width: 2px;
+      height: 22px;
+      background: var(--border);
+    }
+
+    .decision-branches {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.2rem;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .decision-branch {
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: #fbfdfe;
+      overflow: hidden;
+    }
+
+    .decision-branch-label {
+      padding: 0.6rem 1rem;
+      font-size: 0.72rem;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .decision-branch-no .decision-branch-label {
+      color: var(--muted);
+      background: #edf1f4;
+    }
+
+    .decision-branch-yes .decision-branch-label {
+      color: #bb3d49;
+      background: var(--red-soft);
+    }
+
+    .decision-branch-body {
+      padding: 1rem 1.1rem;
+    }
+
+    .decision-branch-body p {
+      margin: 0 0 0.5rem;
+      font-size: 0.88rem;
+      color: var(--text);
+    }
+
+    .decision-case {
+      padding: 0.75rem 0.9rem;
+      border-radius: 12px;
+      background: #fff;
+      border: 1px solid var(--border);
+      margin-top: 0.6rem;
+    }
+
+    .decision-case:first-of-type {
+      margin-top: 0.9rem;
+    }
+
+    .decision-case strong {
+      display: block;
+      color: var(--text-dark);
+      font-size: 0.85rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .decision-case span {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    /* -------------------------
+       TWO COLUMN
+    ------------------------- */
+
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.2rem;
+      margin-top: 1.3rem;
+    }
+
+    .info-box {
+      padding: 1.25rem;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: #fbfdfe;
+    }
+
+    .info-box strong {
+      display: block;
+      color: var(--text-dark);
+      margin-bottom: 0.4rem;
+      font-size: 0.95rem;
+    }
+
+    .info-box p {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    /* -------------------------
+       CHECKLIST
+    ------------------------- */
+
+    .checklist {
+      display: grid;
+      gap: 0.7rem;
+      margin-top: 1.3rem;
+    }
+
+    .check-item {
+      display: flex;
+      gap: 0.9rem;
+      padding: 0.95rem 1.1rem;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: #fbfdfe;
+    }
+
+    .check-item strong {
+      color: var(--text-dark);
+    }
+
+    .check-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 0.15rem;
+    }
+
+    /* -------------------------
+       FOOTER
+    ------------------------- */
+
+    footer {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 1.5rem 3rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    /* -------------------------
+       RESPONSIVE
+    ------------------------- */
+
+    @media (max-width: 800px) {
+      .decision-branches,
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 600px) {
+      header {
+        padding: 3rem 1rem 2rem;
+      }
+
+      main {
+        padding: 0 1rem 3rem;
+      }
+
+      .card {
+        padding: 1.35rem;
+        border-radius: 21px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div class="header-content">
+
+      <div class="eyebrow">
+        HRFlow · Runbook Incident
+      </div>
+
+      <h1>
+        De la détection (P1)
+        <span class="title-highlight">au rollback</span>
+      </h1>
+
+      <p class="intro">
+        Procédure de référence pour l'infrastructure actuelle
+        (Blue-Green EC2/k3s + ALB + RDS partagée). Complète
+        <code>docs/alerting-seuils-simulation.md</code> (seuils des
+        alarmes) et <code>docs/exemple-email-alerte.md</code> (format des
+        notifications).
+      </p>
+
+      <div class="meta">
+        <div class="meta-pill">
+          Date <strong>20 août 2026</strong>
+        </div>
+
+        <div class="meta-pill">
+          Infrastructure <strong>Blue-Green EC2/k3s + ALB + RDS</strong>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <main>
+
+    <!-- NOTE PRIORITE -->
+
+    <section class="card">
+
+      <div class="callout">
+        <strong>ℹ️ docs/RUNBOOK.md est un document antérieur</strong>
+        <p>
+          Écrit pour une architecture mono-serveur SSH/pm2 qui n'existe
+          plus (migration vers Blue-Green depuis). En cas d'incident, se
+          fier à <strong>ce</strong> document.
+        </p>
+      </div>
+
+    </section>
+
+
+    <!-- CLASSIFICATION -->
+
+    <section class="card">
+
+      <div class="section-number">01</div>
+
+      <h2>Classification de sévérité</h2>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Sévérité</th>
+              <th>Définition</th>
+              <th>Exemples d'alarmes (<code>terraform/main.tf</code> / <code>modules/monitoring</code>)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="severity severity-critical">P1 — Critique</span></td>
+              <td>
+                Trafic public impacté, ou risque imminent de coupure
+                totale
+              </td>
+              <td>
+                <code>*-ec2-down</code> sur la couleur <strong>active</strong> ;
+                <code>*-alb-unhealthy-&lt;couleur active&gt;</code> ;
+                <code>*-alb-5xx-high</code> ;
+                <code>*-rds-storage-low</code> (RDS partagée blue+green —
+                impacte tout le monde)
+              </td>
+            </tr>
+            <tr>
+              <td><span class="severity severity-major">P2 — Majeur</span></td>
+              <td>Dégradation de service, pas de coupure</td>
+              <td>
+                <code>*-ec2-cpu-high</code> / <code>*-rds-cpu-high</code> ;
+                <code>*-alb-latency-high</code> ;
+                <code>*-rds-memory-low</code>
+              </td>
+            </tr>
+            <tr>
+              <td><span class="severity severity-minor">P3 — Mineur</span></td>
+              <td>Pas d'impact utilisateur</td>
+              <td>
+                Toute alarme sur la couleur <strong>idle</strong> (elle ne
+                sert pas de trafic — cf. <code>terraform/main.tf</code>,
+                commentaire du job <code>deploy-idle</code>)
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-warning">
+        <strong>⚠️ Point clé Blue-Green</strong>
+        <p>
+          La couleur (blue/green) concernée par l'alarme change tout.
+          Vérifier <code>active_color</code> avant de qualifier la
+          sévérité. Une alarme <code>*-ec2-down</code> sur la couleur
+          <strong>idle</strong> n'est pas un P1 — c'est l'instance qui
+          reçoit le prochain déploiement, pas celle qui sert le trafic.
+        </p>
+      </div>
+
+      <div class="code">cd terraform
+terraform workspace select production   <span class="code-comment"># ou staging</span>
+terraform output -raw active_color</div>
+
+    </section>
+
+
+    <!-- DETECTION -->
+
+    <section class="card">
+
+      <div class="section-number">02</div>
+
+      <h2>Détection</h2>
+
+      <div class="two-col">
+        <div class="info-box">
+          <strong>Email d'alerte</strong>
+          <p>
+            SNS → <code>alert_email</code> : objet
+            <code>ALARM: "&lt;nom-alarme&gt;" in EU (Paris)</code>. Le corps
+            précise la métrique, le seuil franchi et l'action à mener
+            (<code>alarm_description</code>) — voir
+            <code>docs/exemple-email-alerte.md</code>.
+          </p>
+        </div>
+        <div class="info-box">
+          <strong>Remontée manuelle</strong>
+          <p>
+            Client, test manuel : traiter comme un P1 tant que non
+            qualifié différemment (cf. §1).
+          </p>
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- ETAPE 1 -->
+
+    <section class="card">
+
+      <div class="section-number">03</div>
+
+      <h2>Étape 1 — Confirmer l'incident</h2>
+
+      <p>
+        Ne jamais rollback sur la seule foi d'un email : vérifier l'impact
+        réel.
+      </p>
+
+      <div class="code"><span class="code-comment"># Le site répond-il ?</span>
+curl -fsS -o /dev/null -w "%{http_code}\n" http://&lt;alb_dns_name&gt;/
+
+<span class="code-comment"># Quelle couleur est active, et laquelle est visée par l'alarme ?</span>
+cd terraform && terraform workspace select production
+terraform output -raw active_color
+
+<span class="code-comment"># État actuel de l'alarme qui a notifié</span>
+aws cloudwatch describe-alarms --alarm-names "&lt;nom-alarme&gt;" \
+  --query "MetricAlarms[0].[StateValue,StateReason]" --region eu-west-3</div>
+
+      <h3>URLs ALB (stables, ne changent jamais)</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Environnement</th>
+              <th>URL</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Staging</td>
+              <td><code>http://my-project-alb-843501151.eu-west-3.elb.amazonaws.com</code></td>
+            </tr>
+            <tr>
+              <td>Production</td>
+              <td><code>http://hrflow-production-alb-568207110.eu-west-3.elb.amazonaws.com</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="margin-top: 1.1rem;">
+        Si l'alarme concerne un service applicatif précis (pods), se
+        connecter via SSM sur l'instance de la couleur concernée
+        (cf. <code>deploy.yml</code>, job <code>deploy-idle</code>,
+        étapes SSM) :
+      </p>
+
+      <div class="code">aws ssm start-session --target &lt;instance_id&gt;
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+kubectl get pods -n hrflow-&lt;environment&gt;
+kubectl logs -n hrflow-&lt;environment&gt; -l app=&lt;service&gt; --tail=100</div>
+
+    </section>
+
+
+    <!-- ETAPE 2 -->
+
+    <section class="card">
+
+      <div class="section-number">04</div>
+
+      <h2>Étape 2 — Décider : rollback ou investigation ?</h2>
+
+      <div class="decision-tree">
+
+        <div class="decision-root">
+          L'alarme touche-t-elle la couleur ACTIVE
+          (trafic public réellement impacté) ?
+        </div>
+
+        <div class="decision-connector"></div>
+
+        <div class="decision-branches">
+
+          <div class="decision-branch decision-branch-no">
+            <div class="decision-branch-label">Non — couleur idle</div>
+            <div class="decision-branch-body">
+              <p>
+                Pas de rollback nécessaire. Corriger avant le prochain
+                déploiement (l'idle sert de zone de test).
+              </p>
+            </div>
+          </div>
+
+          <div class="decision-branch decision-branch-yes">
+            <div class="decision-branch-label">Oui — couleur active</div>
+            <div class="decision-branch-body">
+
+              <div class="decision-case">
+                <strong>Régression d'un déploiement récent</strong>
+                <span>
+                  ALB 5xx, unhealthy, ec2-down juste après un push sur
+                  main → <strong>ROLLBACK</strong> (§5), immédiat.
+                </span>
+              </div>
+
+              <div class="decision-case">
+                <strong>Cause = RDS (storage/CPU/mémoire)</strong>
+                <span>
+                  ⚠️ Le rollback ALB ne règle rien : la RDS est partagée
+                  entre blue et green (cf. <code>terraform/main.tf</code>,
+                  commentaire « discipline additive-only »). Basculer de
+                  couleur ne change pas la base qui sert les deux. Traiter
+                  directement la RDS (libérer de l'espace, tuer une
+                  requête bloquante <code>pg_stat_activity</code>,
+                  augmenter <code>allocated_storage</code> en dernier
+                  recours).
+                </span>
+              </div>
+
+              <div class="decision-case">
+                <strong>Pic de charge légitime (pas une régression)</strong>
+                <span>
+                  Scaler plutôt que rollback (<code>REPLICAS</code> dans
+                  <code>deploy.yml</code>, ou <code>rds_instance_class</code>).
+                </span>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ETAPE 3 -->
+
+    <section class="card">
+
+      <div class="section-number">05</div>
+
+      <h2>Étape 3 — Déclencher le rollback (cas régression applicative)</h2>
+
+      <p>
+        Le rollback Blue-Green ne redéploie rien : il rebascule le
+        listener ALB vers l'autre couleur, qui tourne déjà la dernière
+        version connue-bonne (c'est le principe même du Blue-Green — cf.
+        <code>rollback.yml</code>). Bascule en quelques secondes, pas de
+        downtime.
+      </p>
+
+      <div class="phase">
+        <div class="phase-header">
+          <div class="phase-number">A</div>
+          <div class="phase-title">Via l'interface GitHub</div>
+        </div>
+        <div class="phase-body">
+          <ul>
+            <li>Onglet <strong>Actions</strong> du repo → workflow <strong>HRFlow Rollback</strong>.</li>
+            <li><strong>Run workflow</strong> → choisir <code>environment</code> (<code>staging</code> ou <code>production</code>).</li>
+            <li>Lancer, suivre les logs (job <code>rollback</code>).</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-header">
+          <div class="phase-number">B</div>
+          <div class="phase-title">Via GitHub CLI</div>
+        </div>
+        <div class="phase-body">
+          <div class="code" style="margin-top: 0;">gh workflow run rollback.yml -f environment=production</div>
+        </div>
+      </div>
+
+      <p style="margin-top: 1.1rem;">
+        Le workflow détermine seul la couleur cible
+        (<code>terraform output active_color</code> puis bascule vers
+        l'autre), applique le changement de listener ALB, et vérifie via
+        <code>curl</code> que l'ALB sert bien la nouvelle couleur avant de
+        terminer.
+      </p>
+
+    </section>
+
+
+    <!-- ETAPE 4 -->
+
+    <section class="card">
+
+      <div class="section-number">06</div>
+
+      <h2>Étape 4 — Vérifier le rollback</h2>
+
+      <div class="code">curl -fsS http://&lt;alb_dns_name&gt;/ > /dev/null && echo OK
+curl -fsS http://&lt;alb_dns_name&gt;/api-docs/json > /dev/null && echo "Gateway + 4 services OK"
+
+cd terraform && terraform workspace select production
+terraform output -raw active_color   <span class="code-comment"># doit refléter la couleur rollback</span></div>
+
+      <p style="margin-top: 1.1rem;">
+        Repasser l'alarme d'origine à <code>OK</code> une fois l'impact
+        confirmé résolu (CloudWatch le fera automatiquement à la prochaine
+        évaluation si la métrique est effectivement revenue sous le seuil
+        — inutile de forcer <code>set-alarm-state</code> en situation
+        réelle, ça sert uniquement à la simulation).
+      </p>
+
+    </section>
+
+
+    <!-- ETAPE 5 -->
+
+    <section class="card">
+
+      <div class="section-number">07</div>
+
+      <h2>Étape 5 — Communication (pendant l'incident, pas après)</h2>
+
+      <p>
+        Documenter en temps réel (pas a posteriori — c'est exactement ce
+        qui a manqué lors de l'incident du 14/15 août 2024, cf.
+        <code>docs/old/incident-aout-2024.md</code>) :
+      </p>
+
+      <div class="checklist">
+        <div class="check-item">
+          <div>
+            <strong>Horodatage</strong>
+            <span>
+              Heure de détection, heure de confirmation, heure de
+              rollback, heure de résolution.
+            </span>
+          </div>
+        </div>
+        <div class="check-item">
+          <div>
+            <strong>Actions et raisons</strong>
+            <span>
+              Ce qui a été tenté et pourquoi (ex. « rollback écarté car
+              cause = RDS partagée »).
+            </span>
+          </div>
+        </div>
+        <div class="check-item">
+          <div>
+            <strong>Notification</strong>
+            <span>
+              Qui a été notifié / doit l'être (client si impact visible
+              côté produit).
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- ETAPE 6 -->
+
+    <section class="card">
+
+      <div class="section-number">08</div>
+
+      <h2>Étape 6 — Post-mortem</h2>
+
+      <p>
+        Après résolution, rédiger un post-mortem court (même gabarit que
+        <code>docs/old/incident-aout-2024.md</code>) :
+      </p>
+
+      <div class="checklist">
+        <div class="check-item">
+          <div>
+            <strong>Résumé</strong>
+            <span>Résumé + durée + impact.</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <div>
+            <strong>Chronologie</strong>
+            <span>Déroulé factuel de l'incident.</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <div>
+            <strong>Cause racine</strong>
+            <span>
+              Pas juste le symptôme — ex. « 5xx » n'est pas une cause,
+              « déploiement d'une migration non rétro-compatible » en est
+              une.
+            </span>
+          </div>
+        </div>
+        <div class="check-item">
+          <div>
+            <strong>Actions décidées</strong>
+            <span>
+              Avec un propriétaire et une échéance — et un suivi réel
+              derrière (le post-mortem d'août 2024 listait des actions
+              jamais faites).
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- ANNEXES -->
+
+    <section class="card">
+
+      <div class="section-number">09</div>
+
+      <h2>Annexes</h2>
+
+      <h3>Alarmes existantes</h3>
+      <p>
+        Voir
+        <code>docs/alerting-seuils-simulation.md#noms-des-alarmes</code>
+        pour la liste complète (staging/production) et les seuils.
+      </p>
+
+      <h3>Rollback vs re-déploiement — ne pas confondre</h3>
+
+      <div class="two-col">
+        <div class="info-box">
+          <strong>Rollback (<code>rollback.yml</code>)</strong>
+          <p>
+            Bascule de trafic instantanée, aucune reconstruction. À
+            utiliser en premier réflexe pour une régression applicative
+            détectée juste après un déploiement.
+          </p>
+        </div>
+        <div class="info-box">
+          <strong>Nouveau déploiement (<code>pipeline.yml</code> → <code>deploy.yml</code>)</strong>
+          <p>
+            Nécessaire si la cause n'est pas liée au dernier déploiement
+            (ex. fuite mémoire lente, incident RDS) ou si un correctif de
+            code est requis avant de pouvoir revenir en service
+            normalement.
+          </p>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer>
+    Runbook Incident HRFlow · 20 août 2026 ·
+    Document de référence pour l'infrastructure Blue-Green actuelle
+  </footer>
+
+</body>
+</html>

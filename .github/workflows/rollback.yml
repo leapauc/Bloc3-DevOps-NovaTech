@@ -68,29 +68,31 @@ jobs:
           echo "Couleur active actuelle : $ACTIVE_COLOR -> rollback vers : $ROLLBACK_COLOR"
           echo "ROLLBACK_COLOR=${ROLLBACK_COLOR}" >> "$GITHUB_ENV"
 
-      # La couleur idle ne reçoit aucun trafic entre deux déploiements : rien
-      # ne garantit qu'elle soit toujours saine (pod crashé, nœud redémarré,
-      # etc.). Basculer le listener dessus sans le savoir transforme un
-      # rollback d'urgence en une seconde panne, découverte seulement via un
-      # curl qui boucle sur des 502 pendant tout le timeout. On vérifie donc
-      # la target group AVANT de toucher au listener, avec le vrai statut/la
-      # vraie raison ELBv2 plutôt qu'un symptôme HTTP.
-      - name: Check rollback target health before switching
+      # La target group de la couleur idle n'est rattachée à AUCUN listener
+      # tant qu'on n'a pas basculé : l'ALB ne lui envoie aucun health check et
+      # la reporte "unused" (Target.NotInUse) qu'elle soit saine ou non. Donc
+      # `describe-target-health` ne veut rien dire avant la bascule — c'est
+      # l'état de l'instance EC2 elle-même qu'il faut vérifier : les deux
+      # couleurs sont censées tourner en continu (design blue/green sans
+      # scale-to-zero), donc une instance arrêtée (ex. coupée manuellement
+      # pour limiter la facturation) casse le filet de sécurité du rollback.
+      - name: Check rollback instance is running before switching
         working-directory: ./terraform
         run: |
           set -euo pipefail
-          TG_ARN="$(terraform output -json target_group_arns | jq -r --arg c "$ROLLBACK_COLOR" '.[$c]')"
-          echo "TG_ARN=${TG_ARN}" >> "$GITHUB_ENV"
+          INSTANCE_ID="$(terraform output -raw "instance_id_${ROLLBACK_COLOR}")"
+          STATE="$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
+            --query "Reservations[0].Instances[0].State.Name" --output text)"
+          echo "Instance ${ROLLBACK_COLOR} (${INSTANCE_ID}) : état = ${STATE}"
 
-          HEALTH_JSON="$(aws elbv2 describe-target-health --target-group-arn "$TG_ARN")"
-          echo "$HEALTH_JSON" | jq -r '.TargetHealthDescriptions[] | "\(.Target.Id): \(.TargetHealth.State) (\(.TargetHealth.Reason // "-"))"'
-
-          UNHEALTHY="$(echo "$HEALTH_JSON" | jq '[.TargetHealthDescriptions[] | select(.TargetHealth.State != "healthy")] | length')"
-          if [ "$UNHEALTHY" -gt 0 ]; then
-            echo "::error::La couleur de rollback (${ROLLBACK_COLOR}) a des cibles non saines sur sa target group. Basculer dessus ne réglera pas l'incident actuel. Vérifier k3s/Traefik sur l'instance ${ROLLBACK_COLOR} (via SSM) avant de continuer."
+          if [ "$STATE" != "running" ]; then
+            echo "::error::L'instance de la couleur de rollback (${ROLLBACK_COLOR}, ${INSTANCE_ID}) est à l'état '${STATE}', pas 'running'."
+            echo "Le design blue/green suppose que les deux couleurs tournent en continu comme filet de sécurité."
+            echo "Si elle a été coupée manuellement (ex. pour limiter la facturation), redémarrer avant de rollback :"
+            echo "  aws ec2 start-instances --instance-ids ${INSTANCE_ID}"
+            echo "Vérifier aussi que la RDS partagée tourne, puis attendre que k3s/Traefik soient de nouveau up avant de relancer ce workflow."
             exit 1
           fi
-          echo "Couleur de rollback (${ROLLBACK_COLOR}) : cibles saines, bascule du listener possible."
 
       - name: Switch ALB listener back
         working-directory: ./terraform
@@ -104,6 +106,7 @@ jobs:
         run: |
           set -euo pipefail
           ALB_DNS_NAME="$(terraform output -raw alb_dns_name)"
+          TG_ARN="$(terraform output -json target_group_arns | jq -r --arg c "$ROLLBACK_COLOR" '.[$c]')"
 
           if timeout 60 bash -c "
             until curl -fsS http://${ALB_DNS_NAME}/ > /dev/null; do

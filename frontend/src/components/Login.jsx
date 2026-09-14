@@ -29,7 +29,7 @@ export default function Login() {
         <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
         <input type="password" placeholder="Mot de passe" value={password} onChange={e => setPassword(e.target.value)} />
         {error && <p className="error">{error}</p>}
-        <button type="submit">Connexion</button>
+        <button type="submit">Connexion Blue</button>
       </form>
     </div>
   )

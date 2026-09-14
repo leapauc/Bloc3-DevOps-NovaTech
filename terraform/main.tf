@@ -345,6 +345,11 @@ output "alb_dns_name" {
   value = module.alb.dns_name
 }
 
+output "target_group_arns" {
+  description = "ARN de la target group par couleur (blue/green) — utilisé par le workflow de rollback pour vérifier la santé des cibles via l'API ELBv2 avant/après bascule du listener."
+  value       = module.alb.target_group_arns
+}
+
 output "active_color" {
   description = "Couleur actuellement servie par l'ALB — lu par le workflow CD pour déterminer la couleur idle avant déploiement"
   value       = var.active_color

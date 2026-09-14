@@ -68,6 +68,30 @@ jobs:
           echo "Couleur active actuelle : $ACTIVE_COLOR -> rollback vers : $ROLLBACK_COLOR"
           echo "ROLLBACK_COLOR=${ROLLBACK_COLOR}" >> "$GITHUB_ENV"
 
+      # La couleur idle ne reçoit aucun trafic entre deux déploiements : rien
+      # ne garantit qu'elle soit toujours saine (pod crashé, nœud redémarré,
+      # etc.). Basculer le listener dessus sans le savoir transforme un
+      # rollback d'urgence en une seconde panne, découverte seulement via un
+      # curl qui boucle sur des 502 pendant tout le timeout. On vérifie donc
+      # la target group AVANT de toucher au listener, avec le vrai statut/la
+      # vraie raison ELBv2 plutôt qu'un symptôme HTTP.
+      - name: Check rollback target health before switching
+        working-directory: ./terraform
+        run: |
+          set -euo pipefail
+          TG_ARN="$(terraform output -json target_group_arns | jq -r --arg c "$ROLLBACK_COLOR" '.[$c]')"
+          echo "TG_ARN=${TG_ARN}" >> "$GITHUB_ENV"
+
+          HEALTH_JSON="$(aws elbv2 describe-target-health --target-group-arn "$TG_ARN")"
+          echo "$HEALTH_JSON" | jq -r '.TargetHealthDescriptions[] | "\(.Target.Id): \(.TargetHealth.State) (\(.TargetHealth.Reason // "-"))"'
+
+          UNHEALTHY="$(echo "$HEALTH_JSON" | jq '[.TargetHealthDescriptions[] | select(.TargetHealth.State != "healthy")] | length')"
+          if [ "$UNHEALTHY" -gt 0 ]; then
+            echo "::error::La couleur de rollback (${ROLLBACK_COLOR}) a des cibles non saines sur sa target group. Basculer dessus ne réglera pas l'incident actuel. Vérifier k3s/Traefik sur l'instance ${ROLLBACK_COLOR} (via SSM) avant de continuer."
+            exit 1
+          fi
+          echo "Couleur de rollback (${ROLLBACK_COLOR}) : cibles saines, bascule du listener possible."
+
       - name: Switch ALB listener back
         working-directory: ./terraform
         run: |
@@ -80,10 +104,17 @@ jobs:
         run: |
           set -euo pipefail
           ALB_DNS_NAME="$(terraform output -raw alb_dns_name)"
-          timeout 60 bash -c "
+
+          if timeout 60 bash -c "
             until curl -fsS http://${ALB_DNS_NAME}/ > /dev/null; do
               echo 'Waiting for ALB to serve the rolled-back color...'
               sleep 3
             done
-          "
-          echo "Rollback confirmé : l'ALB (${ALB_DNS_NAME}) sert de nouveau la couleur ${ROLLBACK_COLOR}."
+          "; then
+            echo "Rollback confirmé : l'ALB (${ALB_DNS_NAME}) sert de nouveau la couleur ${ROLLBACK_COLOR}."
+          else
+            echo "::error::L'ALB continue de renvoyer des erreurs après bascule vers ${ROLLBACK_COLOR}. État des cibles au moment de l'échec :"
+            aws elbv2 describe-target-health --target-group-arn "$TG_ARN" \
+              | jq -r '.TargetHealthDescriptions[] | "\(.Target.Id): \(.TargetHealth.State) (\(.TargetHealth.Reason // "-")) \(.TargetHealth.Description // "")"'
+            exit 1
+          fi

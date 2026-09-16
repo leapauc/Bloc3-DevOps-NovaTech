@@ -26,7 +26,7 @@ export default function Login() {
     <div className="login-container">
       <h1>HRFlow</h1>
       <form onSubmit={handleLogin}>
-        <h4>Blue</h4>
+        <h4>Green</h4>
         <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
         <input type="password" placeholder="Mot de passe" value={password} onChange={e => setPassword(e.target.value)} />
         {error && <p className="error">{error}</p>}

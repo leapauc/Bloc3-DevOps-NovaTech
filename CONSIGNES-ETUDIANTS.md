@@ -74,4 +74,4 @@ novatech-hrflow/
 - Tous les membres doivent comprendre tout le code
 
 *Document fourni le Jour 1 par Théo Marchand*
-Pas plus d'information
+Pas plus d'informations

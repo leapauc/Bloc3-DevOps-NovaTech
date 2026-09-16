@@ -71,12 +71,7 @@ jobs:
             done
           '
 
-      # Cible le spec OpenAPI fusionné du gateway (auth + paie + congés +
-      # recrutement) : c'est le point d'entrée unique réellement exposé, donc
-      # le scan couvre les 4 services sans avoir à les cibler un par un.
-      # ZAP tourne avec --network=host (géré par l'action elle-même), donc
-      # http://localhost:3006 - publié par docker-compose sur le runner -
-      # est directement joignable depuis le conteneur ZAP.
+      # Cible le spec OpenAPI fusionné du gateway (auth + paie + congés + recrutement)
       - name: ZAP API scan
         uses: zaproxy/action-api-scan@5158fe4d9d8fcc75ea204db81317cce7f9e5453d # v0.10.0
         with:
